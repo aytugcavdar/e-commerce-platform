@@ -12,7 +12,7 @@ const Product = require('../models/Product');
 const advancedResults = require('../middleware/advancedResults');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload'); // Cloudinary'ye resim yüklemek için
-
+const { updateStock } = require('../controllers/products'); 
 const router = express.Router();
 
 //--- ROTALARIN TANIMLANMASI ---
