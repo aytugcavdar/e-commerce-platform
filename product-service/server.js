@@ -8,19 +8,16 @@ const cookieParser = require('cookie-parser');
 const cloudinary = require('cloudinary').v2;
 
 // Güvenlik ve Hata Yönetimi Middleware'leri
-const errorHandler = require('./middleware/error');
+const errorHandler = require('./middleware/errorHandler');
 
 // Route dosyaları
 const products = require('./routes/products');
 
 // .env dosyasını yükle
-dotenv.config({ path: './config/config.env' });
+dotenv.config({ path: './.env' });
 
 // Veritabanı bağlantısı
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-});
+mongoose.connect(process.env.MONGO_URI);
 console.log(`ProductDB Bağlandı: ${mongoose.connection.host}`.cyan.underline.bold);
 
 

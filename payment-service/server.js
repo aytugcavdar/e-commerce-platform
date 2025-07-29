@@ -5,10 +5,10 @@ const morgan = require('morgan');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
-const errorHandler = require('./middleware/error');
+const errorHandler = require('./middleware/errorHandler');
 const paymentRoutes = require('./routes/payments');
 
-dotenv.config({ path: './config/config.env' });
+dotenv.config({ path: './.env' });
 
 const app = express();
 app.use(express.json());

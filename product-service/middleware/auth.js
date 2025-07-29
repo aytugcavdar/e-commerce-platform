@@ -1,4 +1,4 @@
-const asyncHandler = require('./async');
+const asyncHandler = require('../utils/asyncHandler'); 
 const ErrorResponse = require('../utils/errorResponse');
 const axios = require('axios');
 

@@ -8,7 +8,7 @@ const {
     updateOrderToPaid 
 } = require('../controllers/orders');
 
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/authMiddeleware');
 
 const router = express.Router();
 

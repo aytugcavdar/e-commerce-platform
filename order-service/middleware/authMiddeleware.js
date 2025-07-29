@@ -1,4 +1,4 @@
-const asyncHandler = require('./async');
+const asyncHandler = require('../utils/asyncHandler'); // Bu dosyanın yolu doğru olmalı
 const ErrorResponse = require('../utils/errorResponse');
 const axios = require('axios');
 
@@ -19,8 +19,8 @@ exports.protect = asyncHandler(async (req, res, next) => {
         });
 
         // 2. AUTH SERVICE'TEN GELEN KULLANICI BİLGİSİNİ BU SERVİSTEKİ req OBJESİNE ATA
-        req.user = data.data; // { id: '...', email: '...', role: 'admin' }
-        
+        req.user = data.data; // { id: '...', email: '...', role: 'user' }
+
         console.log(`İstek yapan kullanıcı: ${req.user.email}, Rol: ${req.user.role}`);
         next();
     } catch (err) {
@@ -28,7 +28,7 @@ exports.protect = asyncHandler(async (req, res, next) => {
     }
 });
 
-// Bu fonksiyon HER SERVİSTE AYNI KALABİLİR. Çünkü req.user objesi yukarıda ayarlandı.
+// Bu fonksiyon, req.user objesi yukarıda ayarlandığı için çalışacaktır.
 exports.authorize = (...roles) => {
     return (req, res, next) => {
         if (!req.user) { // Önce req.user var mı diye kontrol edelim
