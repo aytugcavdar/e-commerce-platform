@@ -2,10 +2,16 @@ const express = require('express');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const morgan = 'morgan';
+const morgan = require('morgan');
 const errorHandler = require('./middleware/errorHandler');
-const authRoutes = require('./controllers/auth'); 
+const authRoutes = require('./routes/auth');
 const cookieParser = require('cookie-parser');
+const colors = require('colors');
+
+
+
+
+
 
 // --- Örnek Route'ları import edelim (kendi dosyalarınızdan alacaksınız) ---
 // const authRoutes = require('./routes/auth');
@@ -15,10 +21,12 @@ const app = express();
 // Çevre değişkenlerini yükle
 dotenv.config({ path: './config/config.env' });
 
+
+
 // Body parser
 app.use(express.json());
 app.use(cookieParser()); 
-
+app.use(morgan('dev'));
 // CORS
 app.use(cors());
 
@@ -26,7 +34,7 @@ app.use(cors());
 // ÖNEMLİ: Bu servis kendi veritabanına bağlanmalı!
 mongoose.connect(process.env.MONGODB_URI);
 mongoose.connection.on('connected', () => {
-    console.log('Auth Service: MongoDB bağlantısı başarılı.');
+    console.log(colors.bold.underline.cyan(`CartDB Bağlandı: ${mongoose.connection.host}`));;
 });
 
 // --- ROUTE'LAR ---

@@ -1,26 +1,24 @@
 const express = require('express');
 const dotenv = require('dotenv');
-const colors = require('colors');
+
 const morgan = require('morgan');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
+const colors = require('colors');
 
 // Güvenlik ve Hata Yönetimi Middleware'leri
-const errorHandler = require('./middleware/error');
+const errorHandler = require('./middleware/errorHandler');
 
 // Route dosyaları
 const cartRoutes = require('./routes/cart');
 
 // .env dosyasını yükle
-dotenv.config({ path: './config/config.env' });
+dotenv.config({ path: './.env' });
 
 // Veritabanı bağlantısı
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-});
-console.log(`CartDB Bağlandı: ${mongoose.connection.host}`.cyan.underline.bold);
+mongoose.connect(process.env.MONGO_URI);
+console.log(colors.bold.underline.cyan(`CartDB Bağlandı: ${mongoose.connection.host}`));
 
 const app = express();
 

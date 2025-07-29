@@ -7,13 +7,13 @@ const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
 
 // Güvenlik ve Hata Yönetimi Middleware'leri
-const errorHandler = require('./middleware/error');
+const errorHandler = require('./middleware/errorHandler');
 
 // Route dosyaları
 const categories = require('./routes/categories');
 
 // .env dosyasını yükle
-dotenv.config({ path: './config/config.env' });
+dotenv.config({ path: './.env' });
 
 // Veritabanı bağlantısı
 mongoose.connect(process.env.MONGO_URI, {
