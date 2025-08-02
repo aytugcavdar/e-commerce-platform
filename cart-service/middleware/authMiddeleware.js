@@ -1,28 +1,27 @@
-const jwt = require('jsonwebtoken');
-const ErrorResponse = require('../utils/errorResponse');
 const asyncHandler = require('../utils/asyncHandler');
+const ErrorResponse = require('../utils/errorResponse');
+const axios = require('axios');
 
 exports.protect = asyncHandler(async (req, res, next) => {
     let token;
-
     if (req.cookies.token) {
         token = req.cookies.token;
     }
 
     if (!token) {
-        return next(new ErrorResponse('Bu rotaya erişim yetkiniz yok (Token bulunamadı)', 401));
+        return next(new ErrorResponse('Erişim yetkiniz yok (Token bulunamadı)', 401));
     }
 
     try {
-        // Token'ı doğrula ve içindeki kullanıcı ID'sini al
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // 1. AUTH SERVICE'E GİT VE TOKEN'IN GEÇERLİ OLUP OLMADIĞINI SOR
+        const { data } = await axios.get('http://localhost:5001/api/auth/me', {
+            headers: { 'Cookie': `token=${token}` } // Token'ı cookie olarak gönder
+        });
 
-        // req.user objesine sadece kullanıcı ID'sini ve rolünü (varsa) ekle
-        req.user = { 
-            id: decoded.id,
-            role: decoded.role 
-        };
+        // 2. AUTH SERVICE'TEN GELEN KULLANICI BİLGİSİNİ BU SERVİSTEKİ req OBJESİNE ATA
+        req.user = data.data; // { id: '...', email: '...', role: 'user' }
 
+        console.log(`İstek yapan kullanıcı: ${req.user.email}, Rol: ${req.user.role}`);
         next();
     } catch (err) {
         return next(new ErrorResponse('Geçersiz token. Erişim yetkiniz yok.', 401));
@@ -31,10 +30,14 @@ exports.protect = asyncHandler(async (req, res, next) => {
 
 exports.authorize = (...roles) => {
     return (req, res, next) => {
-        // Not: Bu basit 'protect' fonksiyonu token'dan rolü okumaz.
-        // Eğer cart-service içinde role göre yetkilendirme gerekirse,
-        // token'a rol bilgisini de eklemeniz ve burada kontrol etmeniz gerekir.
-        // Şimdilik cart-service'te role-based bir kısıtlama olmadığı için bu yeterli.
+        if (!req.user) {
+            return next(new ErrorResponse('Kullanıcı bilgisi bulunamadı, yetkilendirme yapılamıyor.', 401));
+        }
+        if (!roles.includes(req.user.role)) {
+            return next(new ErrorResponse(
+                `'${req.user.role}' rolü bu işlemi yapmak için yetkili değil`, 403
+            ));
+        }
         next();
-    };
+    }
 }

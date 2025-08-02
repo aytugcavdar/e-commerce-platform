@@ -2,6 +2,36 @@ const Order = require('../models/Order');
 const ErrorResponse = require('../utils/errorResponse');
 const asyncHandler = require('../utils/asyncHandler');
 const axios = require('axios');
+const amqp = require('amqplib'); 
+
+/**
+ * RabbitMQ kuyruğuna mesaj yayınlamak için yardımcı fonksiyon.
+ * @param {string} queueName - Mesajın gönderileceği kuyruğun adı.
+ * @param {object} data - Gönderilecek veri (JSON formatında).
+ */
+const publishToQueue = async (queueName, data) => {
+    try {
+        // RabbitMQ sunucusuna bağlan
+        const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://guest:guest@localhost');
+        const channel = await connection.createChannel();
+
+        // Mesajların kaybolmaması için kuyruğun 'durable' olduğundan emin ol
+        await channel.assertQueue(queueName, { durable: true });
+
+        // Mesajı buffer formatında ve 'persistent' olarak kuyruğa gönder
+        channel.sendToQueue(queueName, Buffer.from(JSON.stringify(data)), { persistent: true });
+        
+        console.log(`Mesaj "${queueName}" kuyruğuna gönderildi.`.blue);
+
+        // Bağlantıyı kısa bir süre sonra kapat
+        setTimeout(() => {
+            connection.close();
+        }, 500);
+    } catch (error) {
+        // Hata durumunda sadece konsola log bas, ana işlemi durdurma
+        console.error("RabbitMQ'ya mesaj gönderilemedi:", error);
+    }
+};
 
 /**
  * @desc    Yeni bir sipariş oluşturur.
@@ -13,8 +43,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     const userId = req.user.id;
     const userToken = req.cookies.token;
 
-    // 1. ADIM: Cart Service'ten kullanıcının sepetini al
-    // ----------------------------------------------------
+    // 1. ADIM: Cart Service'ten kullanıcının sepetini al (Bu işlem senkron kalmalı)
     let cart;
     try {
         const { data } = await axios.get('http://localhost:5005/api/cart', {
@@ -30,63 +59,30 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     }
 
     // 2. ADIM: Siparişi veritabanında oluştur
-    // ----------------------------------------------------
     const order = new Order({
         userId: userId,
         orderItems: cart.items,
         shippingAddress: shippingAddress,
         paymentMethod: paymentMethod,
         itemsPrice: cart.totalPrice,
-        taxPrice: 0,       // Vergiyi daha sonra hesaplayabilirsiniz
-        shippingPrice: 0,  // Kargo ücretini daha sonra hesaplayabilirsiniz
+        taxPrice: 0,
+        shippingPrice: 0,
         totalPrice: cart.totalPrice,
     });
 
     const createdOrder = await order.save();
 
-    // 3. ADIM: Product Service'i çağırarak stokları düşür
-    // ----------------------------------------------------
-    try {
-        const orderItemsForStockUpdate = createdOrder.orderItems.map(item => ({
-            productId: item.productId,
-            quantity: item.quantity
-        }));
+    // 3. ADIM: "order.created" OLAYINI MESAJ KUYRUĞUNA GÖNDER
+    // Bu mesajı diğer servisler (product, notification, cart) dinleyecek.
+    const eventData = {
+        order: createdOrder,
+        user: req.user, // E-posta gibi bilgiler için
+        token: userToken // Sepeti temizlemek için
+    };
+    await publishToQueue('order.created', eventData);
 
-        await axios.put('http://localhost:5002/api/products/update-stock', {
-            items: orderItemsForStockUpdate
-        });
-        console.log(`SİPARİŞ BİLGİSİ: Sipariş #${createdOrder._id} için stoklar güncellendi.`.blue);
-    } catch (err) {
-        console.error(`STOK GÜNCELLEME HATASI: Sipariş #${createdOrder._id} için stoklar düşürülemedi.`.red, err.message);
-        // Bu durumda siparişi "Başarısız" olarak işaretleyip yöneticiye bildirim gönderebilirsiniz.
-    }
-
-    // 4. ADIM: Notification Service'i çağırarak onay e-postası gönder
-    // ------------------------------------------------------------------
-    try {
-        const emailMessage = `Merhaba ${req.user.firstName},\n\n#${createdOrder._id} numaralı siparişiniz başarıyla oluşturulmuştur.\n\nToplam Tutar: ${createdOrder.totalPrice} TL\n\nTeşekkür ederiz!`;
-        
-        await axios.post('http://localhost:5003/api/notifications/send', {
-            to: req.user.email,
-            subject: `Siparişiniz Alındı - No: #${createdOrder._id}`,
-            text: emailMessage
-        });
-        console.log(`SİPARİŞ BİLGİSİ: Sipariş #${createdOrder._id} için onay e-postası gönderildi.`.blue);
-    } catch (err) {
-        console.error(`E-POSTA HATASI: Sipariş #${createdOrder._id} için onay e-postası gönderilemedi.`.red, err.message);
-    }
-
-    // 5. ADIM: Cart Service'i çağırarak sepeti temizle
-    // --------------------------------------------------
-    try {
-        await axios.delete('http://localhost:5005/api/cart', {
-            headers: { 'Cookie': `token=${userToken}` }
-        });
-        console.log(`SİPARİŞ BİLGİSİ: Kullanıcı ${userId} için sepet temizlendi.`.blue);
-    } catch (err) {
-        console.error(`SEPET TEMİZLEME HATASI: Sipariş #${createdOrder._id} sonrası sepet temizlenemedi.`.red, err.message);
-    }
-
+    // Kullanıcıya anında yanıt dön. Stok düşürme, bildirim gönderme gibi işlemler
+    // artık arka planda asenkron olarak gerçekleşecek.
     res.status(201).json({ success: true, data: createdOrder });
 });
 
@@ -112,7 +108,6 @@ exports.getOrderById = asyncHandler(async (req, res, next) => {
         return next(new ErrorResponse(`ID'si ${req.params.id} olan sipariş bulunamadı`, 404));
     }
     
-    // Kullanıcının kendi siparişi veya admin olup olmadığını kontrol et
     if (order.userId.toString() !== req.user.id && req.user.role !== 'admin') {
         return next(new ErrorResponse('Bu siparişi görüntüleme yetkiniz yok', 403));
     }
@@ -126,7 +121,7 @@ exports.getOrderById = asyncHandler(async (req, res, next) => {
  * @access  Private/Admin
  */
 exports.getAllOrders = asyncHandler(async (req, res, next) => {
-    const orders = await Order.find({}).populate('userId', 'id name email'); // Kullanıcı bilgilerini de getir
+    const orders = await Order.find({}).populate('userId', 'id name email');
     res.status(200).json({ success: true, count: orders.length, data: orders });
 });
 
@@ -151,12 +146,21 @@ exports.updateOrderStatus = asyncHandler(async (req, res, next) => {
 
     const updatedOrder = await order.save();
 
+    // Sipariş durumu güncellendiğinde de bir olay yayınlayabiliriz.
+    const eventData = {
+        order: updatedOrder,
+        user: { id: order.userId } // Kullanıcı ID'sini gönderiyoruz
+    };
+    await publishToQueue('order.status.updated', eventData);
+
     res.status(200).json({ success: true, data: updatedOrder });
 });
 
-// @desc    Siparişi ödenmiş olarak güncelle
-// @route   PUT /api/orders/:id/pay
-// @access  Private
+/**
+ * @desc    Siparişi ödenmiş olarak güncelle
+ * @route   PUT /api/orders/:id/pay
+ * @access  Private
+ */
 exports.updateOrderToPaid = asyncHandler(async (req, res, next) => {
     const order = await Order.findById(req.params.id);
 
@@ -166,18 +170,9 @@ exports.updateOrderToPaid = asyncHandler(async (req, res, next) => {
     
     order.isPaid = true;
     order.paidAt = Date.now();
-    order.orderStatus = 'Hazırlanıyor'; // Ödeme sonrası yeni durum
-    // Normalde ödeme ağ geçidinden gelen sonuç buraya kaydedilir.
-    // order.paymentResult = {
-    //     id: req.body.id,
-    //     status: req.body.status,
-    //     update_time: req.body.update_time,
-    //     email_address: req.body.payer.email_address
-    // };
+    order.orderStatus = 'Hazırlanıyor';
 
     const updatedOrder = await order.save();
-
-    // İsteğe bağlı: Ödeme başarılı olduğuna dair kullanıcıya bir e-posta daha gönderilebilir.
     
     res.json({ success: true, data: updatedOrder });
 });

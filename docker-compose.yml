@@ -1,0 +1,26 @@
+# docker-compose.yml (Ana dizinde oluşturun veya mevcut olana ekleyin)
+version: '3.8'
+services:
+  rabbitmq:
+    image: "rabbitmq:3.13-management"
+    ports:
+      - "5672:5672"   # Servislerin bağlanacağı port
+      - "15672:15672" # Yönetim arayüzü portu
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false # Sadece geliştirme ortamı için güvenliği kapat
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+volumes:
+  rabbitmq_data:
+  elasticsearch_data:

@@ -1,0 +1,27 @@
+{
+  "name": "e-commerce-platform",
+  "version": "1.0.0",
+  "description": "E-ticaret projesinin ana yöneticisi",
+  "scripts": {
+    "start": "concurrently \"npm run start:gateway\" \"npm run start:auth\" \"npm run start:product\" \"npm run start:category\" \"npm run start:cart\" \"npm run start:order\" \"npm run start:payment\" \"npm run start:notification\"",
+    "start:gateway": "cd api-gateway && nodemon gateway.js",
+    "start:auth": "cd auth-service && nodemon server.js",
+    "start:product": "cd product-service && nodemon server.js",
+    "start:category": "cd category-service && nodemon server.js",
+    "start:cart": "cd cart-service && nodemon server.js",
+    "start:order": "cd order-service && nodemon server.js",
+    "start:payment": "cd payment-service && nodemon server.js",
+    "start:notification": "cd notification-service && nodemon server.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.0"
+  },
+  "dependencies": {
+    "@elastic/elasticsearch": "^9.1.0",
+    "amqplib": "^0.10.8",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0"
+  }
+}
