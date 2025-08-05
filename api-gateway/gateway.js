@@ -56,6 +56,8 @@ app.use('/api/payments', createProxyMiddleware({
     changeOrigin: true,
 }));
 
+
+
 app.listen(PORT, () => {
     console.log(`API Gateway http://localhost:${PORT} adresinde çalışıyor.`);
 });
