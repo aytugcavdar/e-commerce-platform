@@ -1,11 +1,12 @@
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import HomePage from './pages/HomePage';
-import LoginPage from './features/auth/LoginPage';
+
 import CartPage from './pages/CartPage'; // <-- Yeni sayfayı import et
 import './App.css';
 
 import { ToastContainer } from 'react-toastify';
+import AuthPage from './features/auth/AuthPage';
 
 function App() {
   return (
@@ -15,7 +16,7 @@ function App() {
         <main className="flex-grow">
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth" element={<AuthPage />} />
             <Route path="/cart" element={<CartPage />} /> {/* <-- Yeni route'u ekle */}
           </Routes>
         </main>
