@@ -11,49 +11,53 @@ const PORT = 5000;
 app.use(morgan('dev'));
 
 // CORS ayarları (Frontend'in erişebilmesi için)
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:5173', // Yalnızca frontend'den gelen isteklere izin ver
+    credentials: true                // İsteklerde cookie gibi kimlik bilgilerinin gönderilmesine izin ver
+}));
 
 // --- Yönlendirme Kuralları ---
 
-// Kullanıcı ve Yetkilendirme Servisi'ne yönlendirme
-// /api/auth/* gelen tüm istekler http://localhost:5001'e yönlendirilecek
 app.use('/api/auth', createProxyMiddleware({
     target: 'http://localhost:5001',
     changeOrigin: true,
+    pathRewrite: { '^/api/auth': '/' }, // '/api/auth' -> '/'
 }));
 
-// Ürün Servisi'ne yönlendirme
-// /api/products/* gelen tüm istekler http://localhost:5002'ye yönlendirilecek
 app.use('/api/products', createProxyMiddleware({
     target: 'http://localhost:5002',
     changeOrigin: true,
+    pathRewrite: { '^/api/products': '/' }, // '/api/products' -> '/'
 }));
 
-// Bildirim Servisi'ne yönlendirme
 app.use('/api/notifications', createProxyMiddleware({
-    target: 'http://localhost:5003', // Notification Service'in adresi
+    target: 'http://localhost:5003',
     changeOrigin: true,
+    pathRewrite: { '^/api/notifications': '/' }, // '/api/notifications' -> '/'
 }));
 
-// Kategori Servisi'ne yönlendirme
 app.use('/api/categories', createProxyMiddleware({
-    target: 'http://localhost:5004', // Category Service için belirleyeceğiniz port
+    target: 'http://localhost:5004',
     changeOrigin: true,
+    pathRewrite: { '^/api/categories': '/' }, // '/api/categories' -> '/'
 }));
 
 app.use('/api/cart', createProxyMiddleware({
-    target: 'http://localhost:5005', // Cart Service'in adresi
+    target: 'http://localhost:5005',
     changeOrigin: true,
+    pathRewrite: { '^/api/cart': '/' }, // '/api/cart' -> '/'
 }));
 
 app.use('/api/orders', createProxyMiddleware({
-    target: 'http://localhost:5006', // Order Service'in adresi
+    target: 'http://localhost:5006',
     changeOrigin: true,
+    pathRewrite: { '^/api/orders': '/' }, // '/api/orders' -> '/'
 }));
 
 app.use('/api/payments', createProxyMiddleware({
-    target: 'http://localhost:5007', // Payment Service'in adresi
+    target: 'http://localhost:5007',
     changeOrigin: true,
+    pathRewrite: { '^/api/payments': '/' }, // '/api/payments' -> '/'
 }));
 
 

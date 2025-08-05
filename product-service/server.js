@@ -75,8 +75,7 @@ app.use(express.json());
 // Cookie parser
 app.use(cookieParser());
 
-// CORS
-app.use(cors());
+
 
 // Geliştirme ortamında loglama
 if (process.env.NODE_ENV === 'development') {
@@ -84,7 +83,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Rotaları bağlama (Mount routers)
-app.use('/api/products', products);
+app.use('/', products);
 
 // Hata yakalama middleware'ini en sona ekle
 app.use(errorHandler);

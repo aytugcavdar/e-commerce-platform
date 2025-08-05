@@ -5,32 +5,53 @@ const cloudinary = require('cloudinary').v2;
 const crypto = require('crypto');
 const axios = require('axios');
 
-
-// @desc    Register user
-// @route   POST /api/auth/register
 // @desc    Register user
 // @route   POST /api/auth/register
 exports.register = asyncHandler(async (req, res, next) => {
     const { username, email, password, firstName, lastName } = req.body;
 
-    // 1. KULLANICIYI OLUŞTUR (emailVerified varsayılan olarak false)
+    // Avatar yükleme işlemi
+    let avatarData = {
+        public_id: null,
+        url: null
+    };
+
+    if (req.file) {
+        try {
+            const result = await cloudinary.uploader.upload(req.file.path, {
+                folder: 'ecommerce_avatars',
+                width: 500,
+                height: 500,
+                crop: 'limit'
+            });
+            avatarData = {
+                public_id: result.public_id,
+                url: result.secure_url
+            };
+        } catch (error) {
+            return next(new ErrorResponse('Avatar yüklenemedi, lütfen tekrar deneyin.', 500));
+        }
+    }
+
+    // Kullanıcıyı oluştur
     const user = await User.create({
-        username, email, password, firstName, lastName
+        username, 
+        email, 
+        password, 
+        firstName, 
+        lastName,
+        avatar: avatarData
     });
 
-    // 2. DOĞRULAMA TOKEN'I OLUŞTUR VE KAYDET
+    // E-posta doğrulama token'ı oluştur
     const verificationToken = user.getEmailVerificationToken();
     await user.save({ validateBeforeSave: false });
 
-    // 3. DOĞRULAMA URL'İ OLUŞTUR
-    // Bu URL, frontend'de kullanıcının tıklayacağı link olacak.
-    // Frontend bu linki alıp, token ile birlikte backend'e istek atacak.
     const verificationUrl = `${req.protocol}://${req.get('host')}/api/auth/verifyemail/${verificationToken}`;
-
     const message = `Hesabınızı doğrulamak ve üyeliğinizi başlatmak için lütfen bu linke tıklayın: \n\n ${verificationUrl}`;
 
     try {
-        // 4. NOTIFICATION SERVICE İLE E-POSTA GÖNDER
+        // Notification service'e e-posta gönder
         await axios.post(
             'http://localhost:5003/api/notifications/send',
             {
@@ -40,18 +61,31 @@ exports.register = asyncHandler(async (req, res, next) => {
             }
         );
 
-        // 5. KULLANICIYA BİLGİLENDİRME MESAJI DÖN
         res.status(201).json({
             success: true,
-            data: 'Kayıt başarılı! Lütfen hesabınızı doğrulamak için e-posta adresinizi kontrol edin.'
+            message: 'Kayıt başarılı! Lütfen hesabınızı doğrulamak için e-posta adresinizi kontrol edin.',
+            data: {
+                user: {
+                    id: user._id,
+                    username: user.username,
+                    email: user.email,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    avatar: user.avatar,
+                    emailVerified: user.emailVerified
+                }
+            }
         });
 
     } catch (err) {
         console.error('Doğrulama e-postası gönderilemedi:', err);
-        // Hata durumunda oluşturulan kullanıcıyı ve token'ı temizlemek önemlidir.
-        // Bu, kullanıcının aynı e-posta ile tekrar kayıt olabilmesini sağlar.
+        
+        // Avatar silme
+        if (avatarData.public_id) {
+            await cloudinary.uploader.destroy(avatarData.public_id);
+        }
+        
         await User.findByIdAndDelete(user._id);
-
         return next(new ErrorResponse('Kullanıcı kaydı oluşturulamadı, lütfen tekrar deneyin.', 500));
     }
 });
@@ -71,32 +105,30 @@ exports.login = asyncHandler(async (req, res, next) => {
         return next(new ErrorResponse('Geçersiz kimlik bilgileri', 401));
     }
 
-    // Eğer kullanıcı e-posta doğrulamasını yapmadıysa, hata döndür
+    // E-posta doğrulama kontrolü
     if (!user.emailVerified) {
         return next(new ErrorResponse('Giriş yapmadan önce lütfen e-posta adresinizi doğrulayın.', 403)); 
     }
 
-    // --- BİLDİRİM GÖNDER: GÜVENLİK UYARISI ---
-    try {
-        // Son giriş tarihini güncelle
-        user.lastLogin = Date.now();
-        await user.save({ validateBeforeSave: false });
+    // Son giriş tarihini güncelle
+    user.lastLogin = Date.now();
+    await user.save({ validateBeforeSave: false });
 
+    // Güvenlik uyarısı gönder (background'da)
+    try {
         const loginAlertMessage = `Merhaba ${user.firstName}, hesabınıza yeni bir giriş yapıldı. Eğer bu işlemi siz yapmadıysanız lütfen bizimle iletişime geçin.`;
         
         await axios.post(
-            'http://localhost:5003/api/notifications/send', // Notification Service
+            'http://localhost:5003/api/notifications/send',
             {
                 to: user.email,
                 subject: 'Güvenlik Uyarısı: Hesabınıza Giriş Yapıldı',
                 text: loginAlertMessage
             }
         );
-        console.log(`Giriş yapan kullanıcıya güvenlik uyarısı gönderildi: ${user.email}`);
     } catch (err) {
         console.error(`Güvenlik uyarısı gönderilemedi: ${user.email}`, err.message);
     }
-    // -----------------------------------------
 
     sendTokenResponse(user, 200, res, 'Giriş başarılı.');
 });
@@ -104,7 +136,6 @@ exports.login = asyncHandler(async (req, res, next) => {
 // @desc    Verify user's email
 // @route   GET /api/auth/verifyemail/:token
 exports.verifyEmail = asyncHandler(async (req, res, next) => {
-    // URL'den gelen token'ı al ve hash'le
     const emailVerificationToken = crypto
         .createHash('sha256')
         .update(req.params.token)
@@ -116,12 +147,10 @@ exports.verifyEmail = asyncHandler(async (req, res, next) => {
         return next(new ErrorResponse('Geçersiz doğrulama token\'ı', 400));
     }
 
-    // Kullanıcının e-postasını doğrulanmış olarak işaretle
     user.emailVerified = true;
-    user.emailVerificationToken = undefined; // Token'ı temizle
+    user.emailVerificationToken = undefined;
     await user.save();
 
-    // E-posta doğrulandıktan sonra kullanıcıya giriş token'ı vererek oturum açmasını sağla.
     sendTokenResponse(user, 200, res, 'E-posta başarıyla doğrulandı. Giriş yapıldı.');
 });
 
@@ -129,14 +158,40 @@ exports.verifyEmail = asyncHandler(async (req, res, next) => {
 // @route   GET /api/auth/me
 exports.getMe = asyncHandler(async (req, res, next) => {
     const user = await User.findById(req.user.id);
-    res.status(200).json({ success: true, data: user });
+    res.status(200).json({ 
+        success: true, 
+        data: {
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                fullName: user.fullName,
+                avatar: user.avatar,
+                role: user.role,
+                emailVerified: user.emailVerified,
+                lastLogin: user.lastLogin,
+                createdAt: user.createdAt
+            }
+        }
+    });
 });
 
-// Helper function to get token from model and send response
-const sendTokenResponse = (user, statusCode, res) => {
-    const token = user.getSignedJwtToken();
-    res.status(statusCode).json({ success: true, token });
-};
+// @desc    Logout user / clear cookie
+// @route   POST /api/auth/logout
+exports.logout = asyncHandler(async (req, res, next) => {
+    res.cookie('token', 'none', {
+        expires: new Date(Date.now() + 10 * 1000),
+        httpOnly: true
+    });
+
+    res.status(200).json({
+        success: true,
+        message: 'Başarıyla çıkış yapıldı'
+    });
+});
+
 // @desc    Forgot password
 // @route   POST /api/auth/forgotpassword
 exports.forgotPassword = asyncHandler(async (req, res, next) => {
@@ -144,25 +199,21 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-        // Güvenlik için kullanıcı bulunamasa bile "bulunamadı" demeyiz.
-        return next(new ErrorResponse('E-posta gönderildi', 200));
+        return res.status(200).json({ 
+            success: true, 
+            message: 'E-posta gönderildi' 
+        });
     }
 
-    // Sıfırlama token'ını al
     const resetToken = user.getResetPasswordToken();
+    await user.save({ validateBeforeSave: false });
 
-    await user.save({ validateBeforeSave: false }); // Validator'ları atlayarak kaydet
-
-    // Sıfırlama URL'ini oluştur (Frontend'inizin bu rotayı işlemesi gerekecek)
     const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/resetpassword/${resetToken}`;
-
     const message = `Şifrenizi sıfırlamak için lütfen bu linke tıklayın: \n\n ${resetUrl}`;
 
     try {
-        // --- NOTIFICATION SERVICE'E İSTEK ---
-        // Servisler arası iletişim burada gerçekleşiyor.
         await axios.post(
-            'http://localhost:5003/api/notifications/send', // Notification Service'in adresi
+            'http://localhost:5003/api/notifications/send',
             {
                 to: user.email,
                 subject: 'Şifre Sıfırlama İsteği',
@@ -170,11 +221,13 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
             }
         );
 
-        res.status(200).json({ success: true, data: 'E-posta başarıyla gönderildi.' });
+        res.status(200).json({ 
+            success: true, 
+            message: 'E-posta başarıyla gönderildi.' 
+        });
 
     } catch (err) {
         console.error('E-posta gönderme hatası:', err);
-        // Hata durumunda token'ı temizle ki kullanıcı tekrar deneyebilsin.
         user.resetPasswordToken = undefined;
         user.resetPasswordExpire = undefined;
         await user.save({ validateBeforeSave: false });
@@ -183,11 +236,9 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
     }
 });
 
-
 // @desc    Reset password
 // @route   PUT /api/auth/resetpassword/:resettoken
 exports.resetPassword = asyncHandler(async (req, res, next) => {
-    // URL'den gelen token'ı al ve hash'le
     const resetPasswordToken = crypto
         .createHash('sha256')
         .update(req.params.resettoken)
@@ -195,19 +246,55 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
 
     const user = await User.findOne({
         resetPasswordToken,
-        resetPasswordExpire: { $gt: Date.now() } // Token süresinin geçmediğini kontrol et
+        resetPasswordExpire: { $gt: Date.now() }
     });
 
     if (!user) {
         return next(new ErrorResponse('Geçersiz veya süresi dolmuş token', 400));
     }
 
-    // Yeni şifreyi ayarla
     user.password = req.body.password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
     await user.save();
 
-    // Kullanıcıya yeni bir token ile yanıt ver
     sendTokenResponse(user, 200, res, 'Şifre başarıyla güncellendi.');
 });
+
+// Helper function to get token from model, create cookie and send response
+const sendTokenResponse = (user, statusCode, res, message) => {
+    const token = user.getSignedJwtToken();
+
+    const options = {
+        expires: new Date(
+            Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000
+        ),
+        httpOnly: true
+    };
+
+    if (process.env.NODE_ENV === 'production') {
+        options.secure = true;
+    }
+
+    res
+        .status(statusCode)
+        .cookie('token', token, options)
+        .json({
+            success: true,
+            message: message || 'İşlem başarılı',
+            token,
+            data: {
+                user: {
+                    id: user._id,
+                    username: user.username,
+                    email: user.email,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    fullName: user.fullName,
+                    avatar: user.avatar,
+                    role: user.role,
+                    emailVerified: user.emailVerified
+                }
+            }
+        });
+};
