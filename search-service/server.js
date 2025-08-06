@@ -9,7 +9,7 @@ app.use(express.json());
 const esClient = new Client({ node: 'http://localhost:9200' });
 
 // Arama endpoint'i
-app.get('/api/search', async (req, res) => {
+app.get('/', async (req, res) => {
     const { q } = req.query;
     try {
         const { body } = await esClient.search({

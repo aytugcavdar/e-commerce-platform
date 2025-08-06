@@ -19,7 +19,7 @@ if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 }
 
-app.use('/api/payments', paymentRoutes);
+app.use('/', paymentRoutes);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5007;

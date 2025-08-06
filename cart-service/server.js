@@ -27,7 +27,7 @@ if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 }
 
-app.use('/api/cart', cartRoutes);
+app.use('/', cartRoutes);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5005;

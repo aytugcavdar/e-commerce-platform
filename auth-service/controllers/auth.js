@@ -4,11 +4,27 @@ const asyncHandler = require('../utils/asyncHandler');
 const cloudinary = require('cloudinary').v2;
 const crypto = require('crypto');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 // @desc    Register user
 // @route   POST /api/auth/register
 exports.register = asyncHandler(async (req, res, next) => {
+    console.log('📝 Register isteği geldi:', req.body);
+    console.log('📁 Dosya var mı:', req.file ? 'Evet' : 'Hayır');
+    
+    // Cloudinary config kontrolü
+    console.log('☁️ Cloudinary Config Check:');
+    console.log('  - cloud_name:', process.env.CLOUDINARY_CLOUD_NAME || 'MISSING');
+    console.log('  - api_key:', process.env.CLOUDINARY_API_KEY || 'MISSING');
+    console.log('  - api_secret:', process.env.CLOUDINARY_API_SECRET ? 'SET' : 'MISSING');
+
     const { username, email, password, firstName, lastName } = req.body;
+
+    // Zorunlu alanları kontrol et
+    if (!username || !email || !password || !firstName || !lastName) {
+        return next(new ErrorResponse('Tüm zorunlu alanları doldurun', 400));
+    }
 
     // Avatar yükleme işlemi
     let avatarData = {
@@ -18,48 +34,106 @@ exports.register = asyncHandler(async (req, res, next) => {
 
     if (req.file) {
         try {
+            console.log('📁 Avatar yükleme bilgileri:');
+            console.log('  - Dosya yolu:', req.file.path);
+            console.log('  - Dosya boyutu:', req.file.size);
+            console.log('  - MIME type:', req.file.mimetype);
+            
+            // Dosya var mı kontrol et
+            if (!fs.existsSync(req.file.path)) {
+                throw new Error(`Dosya bulunamadı: ${req.file.path}`);
+            }
+            
+            console.log('✅ Dosya mevcut, Cloudinary\'ye yükleniyor...');
+
+            // Cloudinary config'i tekrar set et (güvenlik için)
+            cloudinary.config({
+                cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+                api_key: process.env.CLOUDINARY_API_KEY,
+                api_secret: process.env.CLOUDINARY_API_SECRET,
+                secure: true
+            });
+            
             const result = await cloudinary.uploader.upload(req.file.path, {
                 folder: 'ecommerce_avatars',
                 width: 500,
                 height: 500,
-                crop: 'limit'
+                crop: 'limit',
+                resource_type: 'auto'
             });
+            
             avatarData = {
                 public_id: result.public_id,
                 url: result.secure_url
             };
+
+            console.log('🎉 Avatar başarıyla yüklendi:', {
+                public_id: avatarData.public_id,
+                url: avatarData.url
+            });
+
+            // Geçici dosyayı sil
+            if (fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+                console.log('🗑️ Geçici dosya silindi:', req.file.path);
+            }
+            
         } catch (error) {
-            return next(new ErrorResponse('Avatar yüklenemedi, lütfen tekrar deneyin.', 500));
+            console.error('❌ Avatar yükleme hatası:', error.message);
+            console.error('❌ Hata detayı:', error);
+            
+            // Geçici dosyayı temizle (varsa)
+            if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+                try {
+                    fs.unlinkSync(req.file.path);
+                    console.log('🗑️ Hata sonrası geçici dosya temizlendi');
+                } catch (unlinkError) {
+                    console.error('❌ Geçici dosya silinemedi:', unlinkError.message);
+                }
+            }
+            
+            return next(new ErrorResponse('Avatar yüklenemedi: ' + error.message, 500));
         }
     }
 
     // Kullanıcıyı oluştur
-    const user = await User.create({
-        username, 
-        email, 
-        password, 
-        firstName, 
-        lastName,
-        avatar: avatarData
-    });
-
-    // E-posta doğrulama token'ı oluştur
-    const verificationToken = user.getEmailVerificationToken();
-    await user.save({ validateBeforeSave: false });
-
-    const verificationUrl = `${req.protocol}://${req.get('host')}/api/auth/verifyemail/${verificationToken}`;
-    const message = `Hesabınızı doğrulamak ve üyeliğinizi başlatmak için lütfen bu linke tıklayın: \n\n ${verificationUrl}`;
-
     try {
-        // Notification service'e e-posta gönder
-        await axios.post(
-            'http://localhost:5003/api/notifications/send',
-            {
-                to: user.email,
-                subject: 'Hesabınızı Doğrulayın',
-                text: message
-            }
-        );
+        const user = await User.create({
+            username, 
+            email, 
+            password, 
+            firstName, 
+            lastName,
+            avatar: avatarData
+        });
+
+        console.log('✅ Kullanıcı oluşturuldu:', user._id);
+
+        // E-posta doğrulama token'ı oluştur
+        const verificationToken = user.getEmailVerificationToken();
+        await user.save({ validateBeforeSave: false });
+
+        const verificationUrl = `${req.protocol}://${req.get('host')}/verifyemail/${verificationToken}`;
+        const message = `Hesabınızı doğrulamak ve üyeliğinizi başlatmak için lütfen bu linke tıklayın: \n\n ${verificationUrl}`;
+
+        try {
+            // Notification service'e e-posta gönder
+            await axios.post(
+                'http://localhost:5003/send',
+                {
+                    to: user.email,
+                    subject: 'Hesabınızı Doğrulayın',
+                    text: message
+                },
+                { timeout: 5000 }
+            );
+
+            console.log('📧 Doğrulama e-postası gönderildi:', user.email);
+
+        } catch (emailErr) {
+            console.error('📧 E-posta gönderme hatası:', emailErr.message);
+            // E-posta gönderilmese bile kullanıcı kaydı başarılı sayılsın
+        }
 
         res.status(201).json({
             success: true,
@@ -78,14 +152,31 @@ exports.register = asyncHandler(async (req, res, next) => {
         });
 
     } catch (err) {
-        console.error('Doğrulama e-postası gönderilemedi:', err);
+        console.error('❌ Kullanıcı oluşturma hatası:', err);
         
-        // Avatar silme
+        // Avatar temizle
         if (avatarData.public_id) {
-            await cloudinary.uploader.destroy(avatarData.public_id);
+            try {
+                await cloudinary.uploader.destroy(avatarData.public_id);
+                console.log('🗑️ Cloudinary avatar temizlendi');
+            } catch (cloudinaryErr) {
+                console.error('❌ Avatar silme hatası:', cloudinaryErr);
+            }
         }
         
-        await User.findByIdAndDelete(user._id);
+        // Mongoose validation hatalarını yakala
+        if (err.name === 'ValidationError') {
+            const messages = Object.values(err.errors).map(error => error.message);
+            return next(new ErrorResponse(messages.join(', '), 400));
+        }
+
+        // Duplicate key hatası
+        if (err.code === 11000) {
+            const field = Object.keys(err.keyValue)[0];
+            const message = `Bu ${field === 'email' ? 'e-posta adresi' : 'kullanıcı adı'} zaten kullanımda`;
+            return next(new ErrorResponse(message, 400));
+        }
+
         return next(new ErrorResponse('Kullanıcı kaydı oluşturulamadı, lütfen tekrar deneyin.', 500));
     }
 });
@@ -113,22 +204,6 @@ exports.login = asyncHandler(async (req, res, next) => {
     // Son giriş tarihini güncelle
     user.lastLogin = Date.now();
     await user.save({ validateBeforeSave: false });
-
-    // Güvenlik uyarısı gönder (background'da)
-    try {
-        const loginAlertMessage = `Merhaba ${user.firstName}, hesabınıza yeni bir giriş yapıldı. Eğer bu işlemi siz yapmadıysanız lütfen bizimle iletişime geçin.`;
-        
-        await axios.post(
-            'http://localhost:5003/api/notifications/send',
-            {
-                to: user.email,
-                subject: 'Güvenlik Uyarısı: Hesabınıza Giriş Yapıldı',
-                text: loginAlertMessage
-            }
-        );
-    } catch (err) {
-        console.error(`Güvenlik uyarısı gönderilemedi: ${user.email}`, err.message);
-    }
 
     sendTokenResponse(user, 200, res, 'Giriş başarılı.');
 });
@@ -208,17 +283,18 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
     const resetToken = user.getResetPasswordToken();
     await user.save({ validateBeforeSave: false });
 
-    const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/resetpassword/${resetToken}`;
+    const resetUrl = `${req.protocol}://${req.get('host')}/resetpassword/${resetToken}`;
     const message = `Şifrenizi sıfırlamak için lütfen bu linke tıklayın: \n\n ${resetUrl}`;
 
     try {
         await axios.post(
-            'http://localhost:5003/api/notifications/send',
+            'http://localhost:5003/send',
             {
                 to: user.email,
                 subject: 'Şifre Sıfırlama İsteği',
                 text: message
-            }
+            },
+            { timeout: 5000 }
         );
 
         res.status(200).json({ 

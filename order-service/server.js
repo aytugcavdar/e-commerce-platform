@@ -24,7 +24,7 @@ if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 }
 
-app.use('/api/orders', orderRoutes);
+app.use('/', orderRoutes);
 
 app.use(errorHandler);
 

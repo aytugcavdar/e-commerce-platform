@@ -1,23 +1,51 @@
 const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const cloudinary = require('cloudinary').v2;
+const path = require('path');
+const fs = require('fs');
 
-// Cloudinary yapılandırması
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-});
+// Upload klasörlerini oluştur
+const baseUploadDir = path.join(__dirname, '..', 'uploads');
+const tempUploadDir = path.join(baseUploadDir, 'temp');
 
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'ecommerce_avatars', // Cloudinary'de resimlerin saklanacağı klasör
-        allowed_formats: ['jpeg', 'png', 'jpg'],
-        transformation: [{ width: 500, height: 500, crop: 'limit' }] // Opsiyonel: resimleri yeniden boyutlandır
+// Klasörleri oluştur
+[baseUploadDir, tempUploadDir].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`📁 Klasör oluşturuldu: ${dir}`);
+    } else {
+        console.log(`📁 Klasör mevcut: ${dir}`);
     }
 });
 
-const upload = multer({ storage: storage });
+// Multer storage yapılandırması
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        console.log(`📤 Dosya yükleme konumu: ${tempUploadDir}`);
+        cb(null, tempUploadDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const filename = file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname);
+        console.log(`📝 Dosya adı oluşturuldu: ${filename}`);
+        cb(null, filename);
+    }
+});
+
+// File filter
+const fileFilter = (req, file, cb) => {
+    // Sadece resim dosyalarına izin ver
+    if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+    } else {
+        cb(new Error('Sadece resim dosyaları yüklenebilir!'), false);
+    }
+};
+
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    },
+    fileFilter: fileFilter
+});
 
 module.exports = upload;
