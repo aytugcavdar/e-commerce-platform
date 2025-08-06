@@ -1,5 +1,3 @@
-// notification-service/server.js
-
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
@@ -8,7 +6,7 @@ const cors = require('cors');
 const amqp = require('amqplib'); // RabbitMQ
 const sendEmail = require('./utils/sendEmail');
 
-dotenv.config({ path: './config/config.env' });
+dotenv.config({ path: './.env' });
 
 const app = express();
 const server = http.createServer(app);
@@ -42,7 +40,20 @@ io.on('connection', (socket) => {
     });
 });
 
-app.post('/api/notifications/send-email', (req, res) => { /* ... e-posta kodu ... */ });
+app.post('/api/notifications/send-email', async (req, res) => {
+    const { email, subject, message } = req.body;
+    try {
+        await sendEmail({
+            email,
+            subject,
+            message
+        });
+        res.status(200).json({ success: true, message: 'E-posta gönderildi' });
+    } catch (error) {
+        console.error('E-posta gönderme hatası:', error);
+        res.status(500).json({ success: false, message: 'E-posta gönderilemedi' });
+    }
+});
 app.post('/api/notifications/send-realtime', (req, res) => { /* ... anlık bildirim kodu ... */ });
 
 const PORT = process.env.PORT || 5003;
