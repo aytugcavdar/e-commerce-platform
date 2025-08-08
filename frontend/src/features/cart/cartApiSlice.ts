@@ -1,22 +1,28 @@
 import { apiSlice } from '../../app/apiSlice';
+import { Cart, ApiResponse } from '../../types';
 
 export const cartApiSlice = apiSlice.injectEndpoints({
     endpoints: builder => ({
-        // Sepet içeriğini getirmek için yeni bir query ekliyoruz
-        getCart: builder.query({
-            query: () => '/cart', // API Gateway'deki /api/cart adresine GET isteği atacak
-            providesTags: ['Cart'] // Bu sorgunun sonuçlarını 'Cart' olarak etiketle
+        getCart: builder.query<ApiResponse<Cart>, void>({
+            query: () => '/cart',
+            providesTags: ['Cart']
         }),
-        addToCart: builder.mutation({
+        addToCart: builder.mutation<ApiResponse<Cart>, { productId: string, quantity: number }>({
             query: ({ productId, quantity }) => ({
                 url: '/cart',
                 method: 'POST',
                 body: { productId, quantity }
             }),
-            invalidatesTags: ['Cart'] // Sepete ekleme yapıldığında 'Cart' etiketli cache'i geçersiz kıl
+            invalidatesTags: ['Cart']
+        }),
+        removeFromCart: builder.mutation<ApiResponse<Cart>, string>({
+            query: (productId) => ({
+                url: `/cart/${productId}`,
+                method: 'DELETE',
+            }),
+            invalidatesTags: ['Cart']
         })
     })
 });
 
-// Yeni oluşturulan hook'u da export ediyoruz
-export const { useGetCartQuery, useAddToCartMutation } = cartApiSlice;
+export const { useGetCartQuery, useAddToCartMutation, useRemoveFromCartMutation } = cartApiSlice;

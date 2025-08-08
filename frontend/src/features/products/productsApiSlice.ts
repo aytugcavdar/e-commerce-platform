@@ -1,14 +1,20 @@
 import { apiSlice } from '../../app/apiSlice';
+import { Product, ApiResponse } from '../../types';
 
 export const productsApiSlice = apiSlice.injectEndpoints({
     endpoints: builder => ({
-        // 'getProducts' isminde bir query endpoint'i oluşturuyoruz
-        getProducts: builder.query({
-            query: () => '/products', // API Gateway'deki /api/products adresine istek atacak
-            providesTags: ['Product'] // Cache etiketlemesi
+        getProducts: builder.query<ApiResponse<Product[]>, void>({
+            query: () => '/products',
+            providesTags: (result) => 
+                result?.data 
+                ? [...result.data.map(({ _id }) => ({ type: 'Product' as const, id: _id })), { type: 'Product', id: 'LIST' }]
+                : [{ type: 'Product', id: 'LIST' }],
+        }),
+        getProduct: builder.query<ApiResponse<Product>, string>({
+            query: (id) => `/products/${id}`,
+            providesTags: (result, error, id) => [{ type: 'Product', id }],
         })
     })
 });
 
-// RTK Query, endpoint'e göre bizim için otomatik olarak hook oluşturur:
-export const { useGetProductsQuery } = productsApiSlice;
+export const { useGetProductsQuery, useGetProductQuery } = productsApiSlice;

@@ -1,20 +1,28 @@
 import React from 'react';
-import { useGetCartQuery } from '../features/cart/cartApiSlice';
-import { Link } from 'react-router-dom';
+import { useGetCartQuery } from '../features/cart/cartApiSlice'; // Eksik importu ekleyin
+import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import { Cart, ApiResponse } from '../../types';
 
-const CartPage = () => {
-  const { data: cartData, isLoading, isSuccess, isError, error } = useGetCartQuery();
+const CartPage: React.FC = () => {
+  const { data: cartResponse, isLoading, isSuccess } = useGetCartQuery<ApiResponse<Cart>>(undefined);
+  // Sepetten silme işlemini daha sonra ekleyeceğiz. Şimdilik yorum satırı olarak kalsın.
+  // const [removeFromCart, { isLoading: isRemoving }] = useRemoveFromCartMutation(); 
+  const navigate = useNavigate();
+  
+  const handleCheckout = () => {
+    navigate('/checkout');
+  }
 
   let content;
 
   if (isLoading) {
     content = <div className="text-center"><span className="loading loading-lg"></span></div>;
-  } else if (isSuccess && cartData.data && cartData.data.items.length > 0) {
-    const { items, totalPrice } = cartData.data;
+  } else if (isSuccess && cartResponse?.data && cartResponse.data.items.length > 0) {
+    const { items, totalPrice } = cartResponse.data;
     content = (
       <div className="overflow-x-auto">
         <table className="table w-full">
-          {/* head */}
           <thead>
             <tr>
               <th>Ürün</th>
@@ -51,7 +59,7 @@ const CartPage = () => {
         </table>
         <div className="flex justify-end mt-8 items-center">
             <h2 className="text-2xl font-bold mr-4">Toplam Tutar: {totalPrice} TL</h2>
-            <button className="btn btn-primary">Ödemeye Geç</button>
+            <button onClick={handleCheckout} className="btn btn-primary">Ödemeye Geç</button>
         </div>
       </div>
     );

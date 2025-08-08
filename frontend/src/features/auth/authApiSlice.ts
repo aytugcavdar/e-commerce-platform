@@ -1,5 +1,5 @@
 import { apiSlice } from '../../app/apiSlice';
-
+import { User, ApiResponse } from '../../types';
 export const authApiSlice = apiSlice.injectEndpoints({
     endpoints: builder => ({
         login: builder.mutation({ // Veri değiştiren işlemler (POST, PUT, DELETE) 'mutation' olur
@@ -16,8 +16,12 @@ export const authApiSlice = apiSlice.injectEndpoints({
                 body: userData // form-data olacağı için header'lar otomatik ayarlanır
             })
         }),
+        getMe: builder.query<ApiResponse<{ user: User }>, void>({
+            query: () => '/auth/me',
+            providesTags: ['User']
+        }),
     })
 });
 
 // RTK Query, bizim için otomatik olarak hook'lar oluşturur:
-export const { useLoginMutation, useRegisterMutation } = authApiSlice;
+export const { useLoginMutation, useRegisterMutation, useGetMeQuery } = authApiSlice;

@@ -11,3 +11,6 @@ export const store = configureStore({
         getDefaultMiddleware().concat(apiSlice.middleware),
     devTools: true // Geliştirme ortamında Redux DevTools'u etkinleştir
 });
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;

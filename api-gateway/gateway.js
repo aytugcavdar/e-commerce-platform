@@ -1,68 +1,71 @@
-// gateway.js
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const cors = require('cors');
-const morgan = require('morgan'); // Loglama için
+const morgan = require('morgan');
 
 const app = express();
 const PORT = 5000;
 
-// Gelen istekleri loglamak için
 app.use(morgan('dev'));
 
-// CORS ayarları (Frontend'in erişebilmesi için)
 app.use(cors({
-    origin: 'http://localhost:5173', // Yalnızca frontend'den gelen isteklere izin ver
-    credentials: true                // İsteklerde cookie gibi kimlik bilgilerinin gönderilmesine izin ver
+    origin: 'http://localhost:5173',
+    credentials: true
 }));
 
-// --- Yönlendirme Kuralları ---
-
-app.use('/api/auth', createProxyMiddleware({
-    target: 'http://localhost:5001',
+// Tüm proxy istekleri için ortak seçenekler
+const commonProxyOptions = {
     changeOrigin: true,
-    pathRewrite: { '^/api/auth': '/' }, // '/api/auth' -> '/'
+    onProxyReq: (proxyReq, req, res) => {
+        if (req.headers.cookie) {
+            proxyReq.setHeader('cookie', req.headers.cookie);
+        }
+    }
+};
+
+// Yönlendirme Kuralları
+app.use('/api/auth', createProxyMiddleware({
+    ...commonProxyOptions,
+    target: 'http://localhost:5001',
+    pathRewrite: { '^/api/auth': '/' },
 }));
 
 app.use('/api/products', createProxyMiddleware({
+    ...commonProxyOptions,
     target: 'http://localhost:5002',
-    changeOrigin: true,
-    pathRewrite: { '^/api/products': '/' }, // '/api/products' -> '/'
+    pathRewrite: { '^/api/products': '/' },
 }));
 
 app.use('/api/notifications', createProxyMiddleware({
+    ...commonProxyOptions,
     target: 'http://localhost:5003',
-    changeOrigin: true,
-    pathRewrite: { '^/api/notifications': '/' }, // '/api/notifications' -> '/'
+    pathRewrite: { '^/api/notifications': '/' },
 }));
 
 app.use('/api/categories', createProxyMiddleware({
+    ...commonProxyOptions,
     target: 'http://localhost:5004',
-    changeOrigin: true,
-    pathRewrite: { '^/api/categories': '/' }, // '/api/categories' -> '/'
+    pathRewrite: { '^/api/categories': '/' },
 }));
 
 app.use('/api/cart', createProxyMiddleware({
+    ...commonProxyOptions,
     target: 'http://localhost:5005',
-    changeOrigin: true,
-    pathRewrite: { '^/api/cart': '/' }, // '/api/cart' -> '/'
+    pathRewrite: { '^/api/cart': '/' },
 }));
 
 app.use('/api/orders', createProxyMiddleware({
+    ...commonProxyOptions,
     target: 'http://localhost:5006',
-    changeOrigin: true,
-    pathRewrite: { '^/api/orders': '/' }, // '/api/orders' -> '/'
+    pathRewrite: { '^/api/orders': '/' },
 }));
 
 app.use('/api/payments', createProxyMiddleware({
+    ...commonProxyOptions,
     target: 'http://localhost:5007',
-    changeOrigin: true,
-    pathRewrite: { '^/api/payments': '/' }, // '/api/payments' -> '/'
+    pathRewrite: { '^/api/payments': '/' },
 }));
-
-
 
 app.listen(PORT, () => {
     console.log(`API Gateway http://localhost:${PORT} adresinde çalışıyor.`);
 });
-

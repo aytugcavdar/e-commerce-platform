@@ -1,22 +1,25 @@
 import React from 'react';
 import { useGetProductsQuery } from '../features/products/productsApiSlice';
-import { useAddToCartMutation } from '../features/cart/cartApiSlice'; // Yeni hook'u import et
+import { useAddToCartMutation } from '../features/cart/cartApiSlice';
+import { toast } from 'react-toastify';
+import { Product, ApiResponse } from '../types'; // <-- Merkezi tipleri import et
 
-const HomePage = () => {
-  const { data: productsData, isLoading, isSuccess, isError, error } = useGetProductsQuery();
+const HomePage: React.FC = () => {
+
+  const { data: productsData, isLoading, isSuccess, isError, error } = useGetProductsQuery<ApiResponse<Product[]>>(undefined);
   
-  // Sepete ekleme işlemi için mutation'ı ve onun yüklenme durumunu al
-const [addToCart, { isLoading: isAddingToCart }] = useAddToCartMutation();
+  const [addToCart, { isLoading: isAddingToCart }] = useAddToCartMutation();
 
-  const handleAddToCart = async (productId) => {
+  const handleAddToCart = async (productId: string) => {
     try {
       await addToCart({ productId, quantity: 1 }).unwrap();
-      toast.success('Ürün sepete eklendi!'); // <-- Başarı bildirimi
+      toast.success('Ürün sepete eklendi!');
     } catch (err) {
-      toast.error('Ürün sepete eklenemedi!'); // <-- Hata bildirimi
+      toast.error('Ürün sepete eklenemedi!');
       console.error('Sepete eklenemedi:', err);
     }
   };
+  
   let content;
 
   if (isLoading) {

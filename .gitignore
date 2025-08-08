@@ -48,3 +48,6 @@ coverage
 .idea
 *.swp
 *.swo
+
+# UPLOADS
+auth-service/uploads/
