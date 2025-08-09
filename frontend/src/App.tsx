@@ -19,6 +19,9 @@ import AdminDashboard from './pages/AdminDashboard';
 import AddProductPage from './pages/AddProductPage';
 import ManageProductsPage from './pages/ManageProductsPage';
 
+import PaymentPage from './pages/PaymentPage'; 
+import OrderDetailPage from './pages/OrderDetailPage';
+
 function App() {
   return (
     <Router>
@@ -33,6 +36,8 @@ function App() {
               <Route path="/cart" element={<CartPage />} />
               <Route path="/product/:productId" element={<ProductDetailPage />} />
               <Route path="/checkout" element={<CheckoutPage />} />
+              <Route path="/payment/:orderId" element={<PaymentPage />} />
+              <Route path="/profile/orders/:orderId" element={<OrderDetailPage />} />
               <Route path="/profile" element={<ProfilePage />} />
 
               {/* Admin Rotaları */}

@@ -46,7 +46,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     // 1. ADIM: Cart Service'ten kullanıcının sepetini al (Bu işlem senkron kalmalı)
     let cart;
     try {
-        const { data } = await axios.get('http://localhost:5005/api/cart', {
+         const { data } = await axios.get('http://localhost:5005/', {
             headers: { 'Cookie': `token=${userToken}` }
         });
         cart = data.data;

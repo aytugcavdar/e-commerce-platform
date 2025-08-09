@@ -22,8 +22,15 @@ export const orderApiSlice = apiSlice.injectEndpoints({
                 result?.data 
                 ? [...result.data.map(({ _id }) => ({ type: 'Order' as const, id: _id })), { type: 'Order', id: 'LIST' }]
                 : [{ type: 'Order', id: 'LIST' }],
-        })
+        }),
+        getOrderById: builder.query<ApiResponse<Order>, string>({
+            query: (id) => `/orders/${id}`,
+            providesTags: (result, error, id) => [{ type: 'Order', id }],
+        }),
+    
+        
     })
 });
 
-export const { useCreateOrderMutation, useGetMyOrdersQuery } = orderApiSlice;
+
+export const { useCreateOrderMutation, useGetMyOrdersQuery, useGetOrderByIdQuery } = orderApiSlice;
