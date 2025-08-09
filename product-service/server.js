@@ -9,7 +9,8 @@ const cloudinary = require('cloudinary').v2;
 const amqp = require('amqplib');
 const Product = require('./models/Product');
 
-
+// .env dosyasını yükle
+dotenv.config({ path: './.env' });
 
 async function startOrderCreatedListener() {
     try {
@@ -51,8 +52,7 @@ const errorHandler = require('./middleware/errorHandler');
 // Route dosyaları
 const products = require('./routes/products');
 
-// .env dosyasını yükle
-dotenv.config({ path: './.env' });
+
 
 // Veritabanı bağlantısı
 mongoose.connect(process.env.MONGO_URI);
