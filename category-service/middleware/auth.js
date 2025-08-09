@@ -4,41 +4,100 @@ const axios = require('axios');
 
 exports.protect = asyncHandler(async (req, res, next) => {
     let token;
-    if (req.cookies.token) {
+    
+    // 1. Cookie'den token'ı al
+    if (req.cookies && req.cookies.token) {
         token = req.cookies.token;
+        console.log('🍪 Token cookie\'den alındı:', token ? 'Var' : 'Yok');
+    }
+    
+    // 2. Authorization header'dan token'ı al (fallback)
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        token = req.headers.authorization.split(' ')[1];
+        console.log('🔑 Token authorization header\'dan alındı:', token ? 'Var' : 'Yok');
     }
 
     if (!token) {
+        console.error('❌ Token bulunamadı - Cookie ve Authorization header boş');
         return next(new ErrorResponse('Erişim yetkiniz yok (Token bulunamadı)', 401));
     }
 
     try {
-        // 1. AUTH SERVICE'E GİT VE TOKEN'IN GEÇERLİ OLUP OLMADIĞINI SOR
-        const { data } = await axios.get('http://localhost:5001/api/auth/me', {
-            headers: { 'Cookie': `token=${token}` } // Token'ı cookie olarak gönder
+        console.log('🔄 Auth service\'e doğrulama isteği gönderiliyor...');
+        
+        // Auth service'e kullanıcı doğrulama isteği gönder
+        const response = await axios.get('http://localhost:5001/me', {
+            headers: { 
+                'Cookie': `token=${token}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 5000 // 5 saniye timeout
         });
 
-        // 2. AUTH SERVICE'TEN GELEN KULLANICI BİLGİSİNİ BU SERVİSTEKİ req OBJESİNE ATA
-        req.user = data.data; // { id: '...', email: '...', role: 'admin' }
+        console.log('✅ Auth service yanıtı alındı:', {
+            status: response.status,
+            hasData: !!response.data,
+            hasUser: !!(response.data && response.data.data && response.data.data.user)
+        });
+
+        // Yanıtı kontrol et
+        if (!response.data || !response.data.success || !response.data.data || !response.data.data.user) {
+            console.error('❌ Auth service\'ten geçersiz yanıt:', response.data);
+            return next(new ErrorResponse('Kullanıcı doğrulama başarısız', 401));
+        }
+
+        // Kullanıcı bilgilerini req.user'a ata
+        req.user = response.data.data.user;
         
-        console.log(`İstek yapan kullanıcı: ${req.user.email}, Rol: ${req.user.role}`);
+        console.log('👤 Kullanıcı doğrulandı:', {
+            id: req.user.id,
+            email: req.user.email,
+            role: req.user.role
+        });
+        
         next();
     } catch (err) {
-        return next(new ErrorResponse('Geçersiz token. Erişim yetkiniz yok.', 401));
+        console.error('❌ Auth service iletişim hatası:', {
+            message: err.message,
+            code: err.code,
+            status: err.response?.status,
+            data: err.response?.data
+        });
+
+        // Axios hatası detaylarını kontrol et
+        if (err.response) {
+            // Server yanıt verdi ama hata kodu ile
+            return next(new ErrorResponse(`Auth service hatası: ${err.response.data?.message || 'Doğrulama başarısız'}`, 401));
+        } else if (err.request) {
+            // İstek gönderildi ama yanıt alınamadı
+            return next(new ErrorResponse('Auth service\'e erişilemedi. Lütfen daha sonra tekrar deneyin.', 503));
+        } else {
+            // İstek hazırlanırken hata oluştu
+            return next(new ErrorResponse('Token doğrulama sırasında hata oluştu', 500));
+        }
     }
 });
 
-// Bu fonksiyon HER SERVİSTE AYNI KALABİLİR. Çünkü req.user objesi yukarıda ayarlandı.
 exports.authorize = (...roles) => {
     return (req, res, next) => {
-        if (!req.user) { // Önce req.user var mı diye kontrol edelim
+        if (!req.user) {
+            console.error('❌ req.user bulunamadı, yetkilendirme yapılamıyor');
             return next(new ErrorResponse('Kullanıcı bilgisi bulunamadı, yetkilendirme yapılamıyor.', 401));
         }
+        
         if (!roles.includes(req.user.role)) {
+            console.error(`❌ Yetkilendirme başarısız: ${req.user.role} rolü, gerekli roller: ${roles.join(', ')}`);
             return next(new ErrorResponse(
-                `'${req.user.role}' rolü bu işlemi yapmak için yetkili değil`, 403
+                `'${req.user.role}' rolü bu işlemi yapmak için yetkili değil. Gerekli rol: ${roles.join(', ')}`, 
+                403
             ));
         }
+        
+        console.log('✅ Yetkilendirme başarılı:', {
+            userRole: req.user.role,
+            requiredRoles: roles
+        });
+        
         next();
-    }
-}
+    };
+};

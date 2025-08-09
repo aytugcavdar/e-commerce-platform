@@ -21,6 +21,9 @@ console.log(`CategoryDB Bağlandı: ${mongoose.connection.host}`.cyan.underline.
 
 const app = express();
 
+
+
+
 // Body parser
 app.use(express.json());
 

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const slugify =require('slugify');
+const slugify = require('slugify');
 
 const CategorySchema = new mongoose.Schema({
     name: {
@@ -36,13 +36,18 @@ CategorySchema.pre('save', function(next) {
 });
 
 // Virtual alan: Alt kategorileri getirmek için
-// Bir kategori silindiğinde, bu kategoriyi parent olarak kullanan diğer kategorileri de yönetmemiz gerekecek (CASCADE delete)
-// Bu yüzden bir "pre remove" middleware'i ekleyelim.
-CategorySchema.pre('remove', async function(next) {
-    console.log(`'${this.name}' kategorisine ait alt kategoriler siliniyor...`);
-    // Bu kategoriyi parent olarak kullanan tüm alt kategorileri de sil.
-    await this.model.deleteMany({ parent: this._id });
-    next();
+CategorySchema.virtual('children', {
+    ref: 'Category',
+    localField: '_id',
+    foreignField: 'parent',
+    justOne: false
 });
+
+
+
+// Index'ler
+CategorySchema.index({ slug: 1 });
+CategorySchema.index({ parent: 1 });
+CategorySchema.index({ user: 1 });
 
 module.exports = mongoose.model('Category', CategorySchema);

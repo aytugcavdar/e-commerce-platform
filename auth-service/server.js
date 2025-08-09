@@ -8,6 +8,9 @@ const authRoutes = require('./routes/auth');
 const cookieParser = require('cookie-parser');
 const colors = require('colors');
 
+// Çevre değişkenlerini yükle - EN BAŞTA OLMALI
+dotenv.config({ path: './config/config.env' });
+
 // Cloudinary config - Environment variables yüklendikten sonra
 const cloudinary = require('cloudinary').v2;
 cloudinary.config({
@@ -25,8 +28,7 @@ console.log('Cloudinary configured:', {
 
 const app = express();
 
-// Çevre değişkenlerini yükle - EN BAŞTA OLMALI
-dotenv.config({ path: './config/config.env' });
+
 
 // Debug: Environment variables yüklendi mi?
 console.log('Environment Debug:');
@@ -34,7 +36,7 @@ console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('CLOUDINARY_CLOUD_NAME:', process.env.CLOUDINARY_CLOUD_NAME ? 'LOADED' : 'MISSING');
 console.log('CLOUDINARY_API_KEY:', process.env.CLOUDINARY_API_KEY ? 'LOADED' : 'MISSING');
 
-// CORS - EN BAŞTA OLMALI
+
 app.use(cors({
     origin: 'http://localhost:5173',
     credentials: true

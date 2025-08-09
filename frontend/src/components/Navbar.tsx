@@ -2,7 +2,6 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logOut, selectCurrentUser } from '../features/auth/authSlice';
-import { RootState } from '../app/store';
 
 const Navbar: React.FC = () => {
   const user = useSelector(selectCurrentUser);
@@ -10,7 +9,6 @@ const Navbar: React.FC = () => {
 
   const handleLogout = () => {
     dispatch(logOut());
-    // İsteğe bağlı: Logout API'sine istek atılabilir.
   };
 
   return (
@@ -24,6 +22,10 @@ const Navbar: React.FC = () => {
           <li><Link to="/cart">Sepet</Link></li>
           {user ? (
             <>
+              {/* YENİ: Admin Paneli Linki */}
+              {user.role === 'admin' && (
+                <li><Link to="/admin">Yönetim Paneli</Link></li>
+              )}
               <li><Link to="/profile">Profilim</Link></li>
               <li><button onClick={handleLogout} className="btn btn-ghost">Çıkış Yap</button></li>
             </>

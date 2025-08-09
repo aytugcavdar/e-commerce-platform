@@ -76,14 +76,38 @@ exports.updateCategory = asyncHandler(async (req, res, next) => {
 // @route   DELETE /api/categories/:id
 // @access  Private/Admin
 exports.deleteCategory = asyncHandler(async (req, res, next) => {
+    console.log(`🗑️ Kategori silme işlemi başlatıldı - ID: ${req.params.id}`);
+    
     const category = await Category.findById(req.params.id);
 
     if (!category) {
+        console.log(`❌ Kategori bulunamadı - ID: ${req.params.id}`);
         return next(new ErrorResponse(`ID'si ${req.params.id} olan kategori bulunamadı`, 404));
     }
 
-    // Modelde tanımladığımız 'pre remove' middleware'ini tetiklemek için .remove() kullanıyoruz.
-    await category.remove();
+    console.log(`📋 Kategori bulundu: ${category.name}`);
 
-    res.status(200).json({ success: true, data: {} });
+    try {
+        // Alt kategorileri kontrol et ve sil
+        const childCategories = await Category.find({ parent: req.params.id });
+        
+        if (childCategories.length > 0) {
+            console.log(`🔄 ${childCategories.length} alt kategori bulundu, siliniyor...`);
+            await Category.deleteMany({ parent: req.params.id });
+            console.log(`✅ Alt kategoriler silindi`);
+        }
+
+        // Ana kategoriyi sil
+        await Category.findByIdAndDelete(req.params.id);
+        console.log(`✅ Ana kategori silindi: ${category.name}`);
+
+        res.status(200).json({ 
+            success: true, 
+            message: `'${category.name}' kategorisi başarıyla silindi`,
+            data: {} 
+        });
+    } catch (error) {
+        console.error(`❌ Kategori silme hatası:`, error);
+        return next(new ErrorResponse(`Kategori silinirken hata oluştu: ${error.message}`, 500));
+    }
 });

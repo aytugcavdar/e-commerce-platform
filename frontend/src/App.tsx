@@ -9,9 +9,15 @@ import ProductDetailPage from './pages/ProductDetailPage';
 import CheckoutPage from './pages/CheckoutPage';
 import ProfilePage from './pages/ProfilePage';
 import CategoryAdminPage from './pages/CategoryAdminPage';
-import PersistLogin from './features/auth/PersistLogin'; // <-- Import et
+import PersistLogin from './features/auth/PersistLogin';
 import './App.css';
 import { ToastContainer } from 'react-toastify';
+
+// YENİ SAYFALARI ve ADMIN ROUTE'u import edin
+import AdminRoute from './components/AdminRoute';
+import AdminDashboard from './pages/AdminDashboard';
+import AddProductPage from './pages/AddProductPage';
+import ManageProductsPage from './pages/ManageProductsPage';
 
 function App() {
   return (
@@ -20,14 +26,22 @@ function App() {
         <Navbar />
         <main className="flex-grow container mx-auto p-4">
           <Routes>
-            <Route element={<PersistLogin />}> {/* <-- Sarmalayıcı Route */}
+            <Route element={<PersistLogin />}>
+              {/* Genel Rotalar */}
               <Route path="/" element={<HomePage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/cart" element={<CartPage />} />
               <Route path="/product/:productId" element={<ProductDetailPage />} />
               <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/admin/categories" element={<CategoryAdminPage />} />
+
+              {/* Admin Rotaları */}
+              <Route element={<AdminRoute />}>
+                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin/products/add" element={<AddProductPage />} />
+                <Route path="/admin/categories" element={<CategoryAdminPage />} />
+                <Route path="/admin/products" element={<ManageProductsPage />} />
+              </Route>
             </Route>
           </Routes>
         </main>
