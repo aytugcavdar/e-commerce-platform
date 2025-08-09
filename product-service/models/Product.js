@@ -107,6 +107,12 @@ const ProductSchema = new mongoose.Schema({
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
 });
+ProductSchema.virtual('category', {
+  ref: 'Category', 
+  localField: 'categoryId',
+  foreignField: '_id',
+  justOne: true
+});
 
 // Virtual: Ürün URL'i
 ProductSchema.virtual('url').get(function() {

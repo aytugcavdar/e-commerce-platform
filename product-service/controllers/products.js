@@ -26,7 +26,6 @@ const publishToQueue = async (queueName, data) => {
     }
 };
 
-
 // @desc    Tüm ürünleri getir (Filtreleme, Sıralama, Sayfalama ile)
 // @route   GET /api/products
 // @access  Public
@@ -38,13 +37,55 @@ exports.getProducts = asyncHandler(async (req, res, next) => {
 // @route   GET /api/products/:id
 // @access  Public
 exports.getProduct = asyncHandler(async (req, res, next) => {
-    const product = await Product.findById(req.params.id).populate('category', 'name slug');
+    console.log(`🔍 Ürün aranıyor: ${req.params.id}`);
+    
+    // DÜZELTME: populate('category') yerine populate kullanmayalım
+    // Çünkü model'de 'category' field'ı yok, 'categoryId' var
+    // Ve zaten 'categoryInfo' cache olarak mevcut
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+        console.log(`❌ Ürün bulunamadı: ${req.params.id}`);
+        return next(new ErrorResponse(`ID'si ${req.params.id} olan ürün bulunamadı`, 404));
+    }
+
+    console.log(`✅ Ürün bulundu: ${product.name}`);
+    res.status(200).json({ success: true, data: product });
+});
+
+// ALTERNATIF: Eğer category bilgisine ihtiyacınız varsa bu şekilde yapabilirsiniz
+exports.getProductWithCategory = asyncHandler(async (req, res, next) => {
+    const product = await Product.findById(req.params.id);
 
     if (!product) {
         return next(new ErrorResponse(`ID'si ${req.params.id} olan ürün bulunamadı`, 404));
     }
 
-    res.status(200).json({ success: true, data: product });
+    // Eğer categoryInfo cache'i boş ise, category service'ten çek
+    let productWithCategory = product.toObject();
+    
+    if (!product.categoryInfo || !product.categoryInfo.name) {
+        try {
+            // Category service'ten kategori bilgilerini çek
+            const axios = require('axios');
+            const categoryResponse = await axios.get(`http://localhost:5004/${product.categoryId}`, {
+                timeout: 3000
+            });
+            
+            if (categoryResponse.data && categoryResponse.data.success) {
+                productWithCategory.category = categoryResponse.data.data;
+            }
+        } catch (error) {
+            console.log('Kategori bilgisi alınamadı, cache kullanılıyor:', error.message);
+            // Hata durumunda categoryInfo cache'ini kullan
+            productWithCategory.category = product.categoryInfo;
+        }
+    } else {
+        // Cache'deki kategori bilgisini kullan
+        productWithCategory.category = product.categoryInfo;
+    }
+
+    res.status(200).json({ success: true, data: productWithCategory });
 });
 
 // @desc    Yeni bir ürün oluştur
@@ -52,6 +93,7 @@ exports.getProduct = asyncHandler(async (req, res, next) => {
 // @access  Private/Admin
 exports.createProduct = asyncHandler(async (req, res, next) => {
     req.body.user = req.user.id;
+    req.body.categoryId = req.body.category; 
 
     if (req.files && req.files.length > 0) {
         req.body.images = req.files.map(file => ({
@@ -80,6 +122,8 @@ exports.updateProduct = asyncHandler(async (req, res, next) => {
     if (!product) {
         return next(new ErrorResponse(`ID'si ${req.params.id} olan ürün bulunamadı`, 404));
     }
+    
+    req.body.categoryId = req.body.category; 
     
     if (req.files && req.files.length > 0) {
         req.body.images = req.files.map(file => ({
@@ -148,7 +192,6 @@ exports.updateStock = asyncHandler(async (req, res, next) => {
     // Not: Stok güncellemesi arama servisini de etkilemeli. Bu yüzden burada da bir olay yayınlayabiliriz.
     const updatedProductIds = items.map(item => item.productId);
     await publishToQueue('product.stock.updated', { productIds: updatedProductIds });
-
 
     res.status(200).json({
         success: true,

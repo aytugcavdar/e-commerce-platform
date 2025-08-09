@@ -27,7 +27,7 @@ const router = express.Router();
  * @access  Private (Sadece 'admin' rolündeki kullanıcılar)
  */
 router.route('/')
-    .get(advancedResults(Product, { path: 'category', select: 'name slug' }), getProducts)
+    .get(advancedResults(Product), getProducts)
     .post(protect, authorize('admin'), upload.array('images', 5), createProduct);
 
 /*
