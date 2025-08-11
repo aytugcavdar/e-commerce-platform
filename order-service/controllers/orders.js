@@ -121,7 +121,8 @@ exports.getOrderById = asyncHandler(async (req, res, next) => {
  * @access  Private/Admin
  */
 exports.getAllOrders = asyncHandler(async (req, res, next) => {
-    const orders = await Order.find({}).populate('userId', 'id name email');
+    
+    const orders = await Order.find({}).sort({ createdAt: -1 });
     res.status(200).json({ success: true, count: orders.length, data: orders });
 });
 

@@ -83,16 +83,10 @@ const ProductSchema = new mongoose.Schema({
         maxlength: [160, 'SEO açıklaması en fazla 160 karakter olabilir']
     },
     // Ürün özellikleri (JSON formatında)
-    attributes: [{
-        name: {
-            type: String,
-            required: true
-        },
-        value: {
-            type: String,
-            required: true
-        }
-    }],
+   attributes: [{
+    key: { type: String}, 
+    value: { type: String }  
+}],
     // Fiyat geçmişi (fiyat değişikliklerini takip için)
     priceHistory: [{
         price: Number,

@@ -21,6 +21,8 @@ import ManageProductsPage from './pages/ManageProductsPage';
 
 import PaymentPage from './pages/PaymentPage'; 
 import OrderDetailPage from './pages/OrderDetailPage';
+import ManageOrdersPage from './pages/ManageOrdersPage';
+import EditProductPage from './pages/EditProductPage';
 
 function App() {
   return (
@@ -34,11 +36,12 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/cart" element={<CartPage />} />
-              <Route path="/product/:productId" element={<ProductDetailPage />} />
+              <Route path="/products/:productId" element={<ProductDetailPage />} />
               <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/payment/:orderId" element={<PaymentPage />} />
               <Route path="/profile/orders/:orderId" element={<OrderDetailPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+
 
               {/* Admin Rotaları */}
               <Route element={<AdminRoute />}>
@@ -46,6 +49,8 @@ function App() {
                 <Route path="/admin/products/add" element={<AddProductPage />} />
                 <Route path="/admin/categories" element={<CategoryAdminPage />} />
                 <Route path="/admin/products" element={<ManageProductsPage />} />
+                <Route path="/admin/orders" element={<ManageOrdersPage />} />
+                 <Route path="/admin/products/edit/:productId" element={<EditProductPage />} />
               </Route>
             </Route>
           </Routes>

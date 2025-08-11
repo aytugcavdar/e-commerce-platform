@@ -55,12 +55,12 @@ const ManageProductsPage: React.FC = () => {
                                     </div>
                                 </td>
                                 <td>{product.name}</td>
-                                <td>{product.category?.name || 'Belirtilmemiş'}</td>
+                                <td>{product.categoryInfo?.name || 'Belirtilmemiş'}</td>
                                 <td>{product.price} TL</td>
                                 <td>{product.stock}</td>
                                 <td className="space-x-2">
-                                    <button className="btn btn-sm btn-outline btn-info" disabled>Düzenle</button>
-                                    <button 
+                                    <Link to={`/admin/products/edit/${product._id}`} className="btn btn-sm btn-outline btn-info">Düzenle</Link>
+                                    <button
                                         className="btn btn-sm btn-outline btn-error"
                                         onClick={() => handleDelete(product._id)}
                                         disabled={isDeleting}

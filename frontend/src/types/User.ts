@@ -15,8 +15,14 @@ export interface User {
   createdAt: string;
 }
 
-// Auth slice'ının state yapısı
 export interface AuthState {
     user: User | null;
     token: string | null;
 }
+
+export type ProfileUpdateFormData = {
+  firstName: string;
+  lastName: string;
+  username: string;
+  avatar?: FileList;
+};

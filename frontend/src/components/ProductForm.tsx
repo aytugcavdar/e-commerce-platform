@@ -1,8 +1,10 @@
-import React from 'react';
+// frontend/src/components/ProductForm.tsx
+
+import React, { useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { useCreateProductMutation } from '../features/products/productsApiSlice';
+import { useCreateProductMutation, useUpdateProductMutation } from '../features/products/productsApiSlice';
 import { useGetCategoriesQuery } from '../features/categories/categoryApiSlice';
 import { Category, Product } from '../types';
 
@@ -15,12 +17,30 @@ interface IFormInput {
     images: FileList;
 }
 
-const ProductForm: React.FC = () => {
-    const { register, handleSubmit, formState: { errors } } = useForm<IFormInput>();
+// Yeni: Component'in prop'larını tanımla
+interface ProductFormProps {
+    existingProduct?: Product;
+}
+
+const ProductForm: React.FC<ProductFormProps> = ({ existingProduct }) => {
+    const { register, handleSubmit, formState: { errors }, setValue } = useForm<IFormInput>();
     const navigate = useNavigate();
 
     const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
+    const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
     const { data: categoriesData, isLoading: isLoadingCategories } = useGetCategoriesQuery();
+
+    const isEditMode = !!existingProduct;
+
+    useEffect(() => {
+        if (isEditMode) {
+            setValue('name', existingProduct.name);
+            setValue('description', existingProduct.description);
+            setValue('price', existingProduct.price);
+            setValue('stock', existingProduct.stock);
+            setValue('category', existingProduct.categoryId);
+        }
+    }, [existingProduct, isEditMode, setValue]);
 
     const onSubmit: SubmitHandler<IFormInput> = async (data) => {
         const formData = new FormData();
@@ -30,18 +50,23 @@ const ProductForm: React.FC = () => {
         formData.append('stock', String(data.stock));
         formData.append('category', data.category);
 
-        if (data.images) {
+        if (data.images && data.images.length > 0) {
             for (let i = 0; i < data.images.length; i++) {
                 formData.append('images', data.images[i]);
             }
         }
 
         try {
-            await createProduct(formData).unwrap();
-            toast.success('Ürün başarıyla oluşturuldu!');
+            if (isEditMode) {
+                await updateProduct({ id: existingProduct._id, productData: formData }).unwrap();
+                toast.success('Ürün başarıyla güncellendi!');
+            } else {
+                await createProduct(formData).unwrap();
+                toast.success('Ürün başarıyla oluşturuldu!');
+            }
             navigate('/admin/products'); 
         } catch (err) {
-            toast.error('Ürün oluşturulurken bir hata oluştu.');
+            toast.error(`İşlem sırasında bir hata oluştu: ${isEditMode ? 'güncellenirken' : 'oluşturulurken'}.`);
             console.error(err);
         }
     };
@@ -49,6 +74,7 @@ const ProductForm: React.FC = () => {
     return (
         <div className="card bg-base-200 shadow-xl p-6">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                {/* Form alanları aynı kalıyor */}
                 <div className="form-control">
                     <label className="label"><span className="label-text">Ürün Adı</span></label>
                     <input type="text" {...register('name', { required: 'Ürün adı zorunludur' })} className="input input-bordered w-full" />
@@ -86,14 +112,13 @@ const ProductForm: React.FC = () => {
                 </div>
 
                  <div className="form-control">
-                    <label className="label"><span className="label-text">Ürün Resimleri</span></label>
+                    <label className="label"><span className="label-text">Ürün Resimleri {isEditMode && '(Değiştirmek için seçin)'}</span></label>
                     <input type="file" {...register('images')} multiple accept="image/*" className="file-input file-input-bordered w-full" />
                 </div>
 
-
                 <div className="flex justify-end pt-4">
-                     <button type="submit" className="btn btn-primary" disabled={isCreating}>
-                        {isCreating ? <span className="loading loading-spinner"></span> : 'Ürünü Kaydet'}
+                     <button type="submit" className="btn btn-primary" disabled={isCreating || isUpdating}>
+                        {(isCreating || isUpdating) ? <span className="loading loading-spinner"></span> : (isEditMode ? 'Değişiklikleri Kaydet' : 'Yeni Ürünü Kaydet')}
                     </button>
                 </div>
             </form>

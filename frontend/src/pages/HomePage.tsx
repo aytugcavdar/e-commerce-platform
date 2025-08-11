@@ -3,6 +3,9 @@ import { useGetProductsQuery } from '../features/products/productsApiSlice';
 import { useAddToCartMutation } from '../features/cart/cartApiSlice';
 import { toast } from 'react-toastify';
 import { Product, ApiResponse } from '../types'; // <-- Merkezi tipleri import et
+import { useNavigate } from 'react-router-dom';
+
+
 
 const HomePage: React.FC = () => {
 
@@ -10,6 +13,13 @@ const HomePage: React.FC = () => {
   
   const [addToCart, { isLoading: isAddingToCart }] = useAddToCartMutation();
 
+  const navigate = useNavigate();
+
+  const handleClick = (productId: string) => {
+    navigate(`/products/${productId}`);
+  };
+
+  console.log('Ürünler:', productsData);
   const handleAddToCart = async (productId: string) => {
     try {
       await addToCart({ productId, quantity: 1 }).unwrap();
@@ -29,7 +39,7 @@ const HomePage: React.FC = () => {
     content = (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {products.map((product) => (
-          <div key={product._id} className="card bg-base-100 shadow-xl">
+          <div key={product._id} onClick={() => handleClick(product._id)} className="card bg-base-100 shadow-xl">
             <figure>
               <img src={product.images[0]?.url || 'https://via.placeholder.com/400x225'} alt={product.name} className="h-60 w-full object-cover" />
             </figure>
