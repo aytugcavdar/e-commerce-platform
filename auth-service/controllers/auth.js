@@ -112,11 +112,11 @@ exports.register = asyncHandler(async (req, res, next) => {
     try {
       // Notification service'e e-posta gönder
       await axios.post(
-        "http://localhost:5003/api/notifications/send-email", // <-- Düzeltilen Kısım
+        "http://localhost:5003/api/notifications/send-email",
         {
-          email: user.email, // <-- Parametre adını 'to' yerine 'email' yapın
+          email: user.email, 
           subject: "Hesabınızı Doğrulayın",
-          message: message, // <-- Parametre adını 'text' yerine 'message' yapın
+          message: message,
         },
         { timeout: 5000 }
       );

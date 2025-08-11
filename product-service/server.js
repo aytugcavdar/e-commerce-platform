@@ -14,10 +14,10 @@ dotenv.config({ path: './.env' });
 
 async function startOrderCreatedListener() {
     try {
-        const connection = await amqp.connect('amqp://guest:guest@localhost');
+        const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://guest:guest@localhost');
         const channel = await connection.createChannel();
         const queueName = 'order.created';
-        
+
         await channel.assertQueue(queueName, { durable: true });
         console.log(`[Product-Service] "${queueName}" kuyruğu dinleniyor.`.green);
 
@@ -25,7 +25,8 @@ async function startOrderCreatedListener() {
             if (msg !== null) {
                 const { order } = JSON.parse(msg.content.toString());
                 console.log(`[Product-Service] Sipariş #${order._id} için stok güncelleme işlemi alındı.`.cyan);
-                
+
+                // Gelen siparişteki ürünler için stok düşürme operasyonlarını hazırla
                 const bulkOps = order.orderItems.map(item => ({
                     updateOne: {
                         filter: { _id: item.productId },
@@ -33,11 +34,12 @@ async function startOrderCreatedListener() {
                     }
                 }));
 
+                // Eğer güncellenecek ürün varsa, veritabanına tek seferde yaz
                 if (bulkOps.length > 0) {
                     await Product.bulkWrite(bulkOps);
                     console.log(`[Product-Service] Stoklar güncellendi.`.cyan.bold);
                 }
-                
+
                 channel.ack(msg); // Mesajın başarıyla işlendiğini onayla
             }
         });
@@ -45,6 +47,7 @@ async function startOrderCreatedListener() {
         console.error("[Product-Service] RabbitMQ bağlantı hatası:", error);
     }
 }
+
 
 // Güvenlik ve Hata Yönetimi Middleware'leri
 const { errorHandler } = require('@e-commerce/shared-utils');

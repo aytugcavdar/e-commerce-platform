@@ -24,9 +24,9 @@ const sendEmail = async (options) => {
   // E-posta seçenekleri
   const mailOptions = {
     from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
-    to: options.email,
+    to: options.email,     
     subject: options.subject,
-    text: options.message,
+    text: options.message,     
   };
 
   // Ekler varsa ekle

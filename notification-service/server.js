@@ -69,20 +69,25 @@ async function startEventListeners() {
         // Sipariş oluşturulduğunda e-posta gönder
         const orderCreatedQueue = 'order.created';
         await channel.assertQueue(orderCreatedQueue, { durable: true });
-        channel.consume(orderCreatedQueue, async (msg) => {
-            if (msg) {
-                const { order, user } = JSON.parse(msg.content.toString());
-                console.log(`[Notification-Service] Sipariş #${order._id} için e-posta gönderme işi alındı.`.cyan);
-                try {
-                    const emailMessage = `Merhaba ${user.firstName},\n\n#${order._id} numaralı siparişiniz başarıyla oluşturulmuştur.\n\nToplam Tutar: ${order.totalPrice} TL`;
-                    await sendEmail({ to: user.email, subject: `Siparişiniz Alındı - No: #${order._id}`, text: emailMessage });
-                    console.log(`[Notification-Service] Sipariş e-postası gönderildi.`.cyan.bold);
-                } catch (emailError) {
-                    console.error("E-posta gönderim hatası:", emailError);
-                }
-                channel.ack(msg);
-            }
-        });
+       channel.consume(orderCreatedQueue, async (msg) => {
+    if (msg) {
+        const { order, user } = JSON.parse(msg.content.toString());
+        try {
+            const emailMessage = `Merhaba ${user.firstName},\n\n#${order._id} numaralı siparişiniz başarıyla oluşturulmuştur.\n\nToplam Tutar: ${order.totalPrice} TL`;
+            
+            // Parametre adlarını düzelt
+            await sendEmail({
+                email: user.email,
+                subject: `Siparişiniz Alındı - No: #${order._id}`,
+                message: emailMessage
+            });
+            console.log(`[Notification-Service] Sipariş e-postası gönderildi.`.cyan.bold);
+        } catch (emailError) {
+            console.error("E-posta gönderim hatası:", emailError);
+        }
+        channel.ack(msg);
+    }
+});
 
         // Sipariş durumu güncellendiğinde anlık bildirim gönder
         const orderUpdatedQueue = 'order.status.updated';
