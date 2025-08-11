@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
 
 // Güvenlik ve Hata Yönetimi Middleware'leri
-const errorHandler = require('./middleware/errorHandler');
+const { errorHandler } = require('@e-commerce/shared-utils');
 
 // Route dosyaları
 const categories = require('./routes/categories');

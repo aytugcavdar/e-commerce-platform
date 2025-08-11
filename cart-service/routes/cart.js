@@ -6,7 +6,8 @@ const {
     clearCart
 } = require('../controllers/cart');
 
-const { protect } = require('../middleware/authMiddeleware');
+const { authMiddleware } = require('@e-commerce/shared-utils'); // EKLEYİN
+const { protect } = authMiddleware;
 
 const router = express.Router();
 

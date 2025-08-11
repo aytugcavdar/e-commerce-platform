@@ -1,5 +1,4 @@
-const ErrorResponse = require('../utils/errorResponse');
-const asyncHandler = require('../utils/asyncHandler');
+const { ErrorResponse, asyncHandler } = require('@e-commerce/shared-utils');
 const axios = require('axios');
 
 // @desc    Bir sipariş için ödeme işlemini başlatır (Simülasyon)

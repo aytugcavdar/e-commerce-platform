@@ -1,7 +1,5 @@
 const Category = require('../models/Category');
-const ErrorResponse = require('../utils/errorResponse');
-const asyncHandler = require('../utils/asyncHandler');
-
+const { ErrorResponse, asyncHandler } = require('@e-commerce/shared-utils');
 // @desc    Tüm kategorileri getir (Hiyerarşik yapı ile)
 // @route   GET /api/categories
 // @access  Public

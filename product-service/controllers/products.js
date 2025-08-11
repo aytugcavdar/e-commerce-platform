@@ -1,8 +1,7 @@
 // product-service/controllers/products.js
 
 const Product = require('../models/Product');
-const ErrorResponse = require('../utils/errorResponse');
-const asyncHandler = require('../utils/asyncHandler');
+const { ErrorResponse, asyncHandler } = require('@e-commerce/shared-utils');
 const cloudinary = require('cloudinary').v2;
 const amqp = require('amqplib'); // RabbitMQ kütüphanesini import ediyoruz
 

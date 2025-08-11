@@ -1,6 +1,18 @@
 {
   "name": "e-commerce-platform",
   "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "api-gateway",
+    "auth-service",
+    "product-service",
+    "category-service",
+    "cart-service",
+    "order-service",
+    "payment-service",
+    "notification-service",
+    "shared-utils"
+  ],
   "description": "E-ticaret projesinin ana yöneticisi",
   "scripts": {
     "start": "concurrently \"npm run start:gateway\" \"npm run start:auth\" \"npm run start:product\" \"npm run start:category\" \"npm run start:cart\" \"npm run start:order\" \"npm run start:payment\" \"npm run start:notification\"",
@@ -11,7 +23,8 @@
     "start:cart": "cd cart-service && nodemon server.js",
     "start:order": "cd order-service && nodemon server.js",
     "start:payment": "cd payment-service && nodemon server.js",
-    "start:notification": "cd notification-service && nodemon server.js"
+    "start:notification": "cd notification-service && nodemon server.js",
+    "install:all": "npm install --workspaces"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

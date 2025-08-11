@@ -10,8 +10,9 @@ const {
 // Gerekli modelleri ve middleware'leri import ediyoruz
 const Product = require('../models/Product');
 const advancedResults = require('../middleware/advancedResults');
-const { protect, authorize } = require('../middleware/auth');
-const upload = require('../middleware/upload'); // Cloudinary'ye resim yüklemek için
+const { authMiddleware } = require('@e-commerce/shared-utils'); 
+const { protect, authorize } = authMiddleware;
+const upload = require('../middleware/upload'); 
 const { updateStock } = require('../controllers/products'); 
 const router = express.Router();
 

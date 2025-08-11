@@ -8,7 +8,8 @@ const {
     updateOrderToPaid 
 } = require('../controllers/orders');
 
-const { protect, authorize } = require('../middleware/authMiddeleware');
+const { authMiddleware } = require('@e-commerce/shared-utils'); // EKLEYİN
+const { protect, authorize } = authMiddleware;
 
 const router = express.Router();
 

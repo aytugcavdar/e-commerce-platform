@@ -5,7 +5,7 @@ const morgan = require('morgan');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
-const errorHandler = require('./middleware/errorHandler');
+const { errorHandler } = require('@e-commerce/shared-utils');
 const paymentRoutes = require('./routes/payments');
 
 dotenv.config({ path: './.env' });

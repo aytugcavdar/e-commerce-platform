@@ -10,8 +10,8 @@ const {
 } = require('../controllers/categories');
 
 // Middleware'leri import et
-const { protect, authorize } = require('../middleware/auth');
-
+const { authMiddleware } = require('@e-commerce/shared-utils');
+const { protect, authorize } = authMiddleware;
 const router = express.Router();
 
 // Public Rotalar (Herkes erişebilir)

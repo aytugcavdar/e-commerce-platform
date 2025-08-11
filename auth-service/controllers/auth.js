@@ -1,6 +1,5 @@
 const User = require("../models/User");
-const ErrorResponse = require("../utils/errorResponse");
-const asyncHandler = require("../utils/asyncHandler");
+const { ErrorResponse, asyncHandler } = require('@e-commerce/shared-utils');
 const cloudinary = require("cloudinary").v2;
 const crypto = require("crypto");
 const axios = require("axios");

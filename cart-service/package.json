@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@e-commerce/shared-utils": "file:../shared-utils",
     "amqplib": "^0.10.8",
     "axios": "^1.11.0",
     "colors": "^1.4.0",

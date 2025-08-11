@@ -9,7 +9,7 @@ const cookieParser = require('cookie-parser');
 const colors = require('colors');
 const amqp = require('amqplib'); // RabbitMQ
 
-const errorHandler = require('./middleware/errorHandler');
+const { errorHandler } = require('@e-commerce/shared-utils');
 const cartRoutes = require('./routes/cart');
 const Cart = require('./models/Cart'); // Kendi modelini import et
 

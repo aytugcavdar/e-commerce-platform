@@ -9,7 +9,8 @@ const {
     verifyEmail 
 } = require('../controllers/auth');
 const upload = require('../middleware/upload');
-const { protect } = require('../middleware/authMiddeleware');
+const { authMiddleware } = require('@e-commerce/shared-utils');
+const { protect } = authMiddleware;
 
 const router = express.Router();
 

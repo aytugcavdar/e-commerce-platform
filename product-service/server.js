@@ -47,7 +47,7 @@ async function startOrderCreatedListener() {
 }
 
 // Güvenlik ve Hata Yönetimi Middleware'leri
-const errorHandler = require('./middleware/errorHandler');
+const { errorHandler } = require('@e-commerce/shared-utils');
 
 // Route dosyaları
 const products = require('./routes/products');

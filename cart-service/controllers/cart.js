@@ -1,6 +1,5 @@
 const Cart = require('../models/Cart');
-const ErrorResponse = require('../utils/errorResponse');
-const asyncHandler = require('../utils/asyncHandler');
+const { ErrorResponse, asyncHandler } = require('@e-commerce/shared-utils');
 const axios = require('axios');
 
 // @desc    Kullanıcının sepetini getir

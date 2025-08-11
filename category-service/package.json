@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@e-commerce/shared-utils": "file:../shared-utils",
     "axios": "^1.11.0",
     "colors": "^1.4.0",
     "cors": "^2.8.5",

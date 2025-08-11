@@ -6,7 +6,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
 
-const errorHandler = require('./middleware/errorHandler');
+const { errorHandler } = require('@e-commerce/shared-utils');
 const orderRoutes = require('./routes/orders');
 
 dotenv.config({ path: './.env' });

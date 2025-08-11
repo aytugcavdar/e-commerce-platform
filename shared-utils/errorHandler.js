@@ -1,4 +1,4 @@
-const ErrorResponse = require("../utils/errorResponse");
+const ErrorResponse = require("./errorResponse"); 
 
 /**
  * Express hata yakalayıcı middleware
