@@ -5,6 +5,8 @@ import { useCreateOrderMutation } from '../features/orders/orderApiSlice';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { ShippingAddress } from '../types';
+import { useNotify } from '../hooks/useNotify';
+
 
 interface IFormInput extends ShippingAddress {
   paymentMethod: string;
@@ -14,7 +16,7 @@ const CheckoutPage: React.FC = () => {
     const { register, handleSubmit, formState: { errors } } = useForm<IFormInput>();
     const [createOrder, { isLoading }] = useCreateOrderMutation();
     const navigate = useNavigate();
-
+    const notify = useNotify();
     const onSubmit: SubmitHandler<IFormInput> = async (data) => {
         try {
             const orderData = {
@@ -27,10 +29,10 @@ const CheckoutPage: React.FC = () => {
                 paymentMethod: data.paymentMethod,
             };
             const result = await createOrder(orderData).unwrap();
-            toast.success('Siparişiniz başarıyla oluşturuldu. Ödemeye yönlendiriliyorsunuz.');
+            notify.success('Siparişiniz başarıyla oluşturuldu. Ödemeye yönlendiriliyorsunuz.');
             navigate(`/payment/${result.data._id}`);
         } catch (err) {
-            toast.error('Sipariş oluşturulurken bir hata oluştu.');
+            notify.error('Sipariş oluşturulurken bir hata oluştu.');
             console.error(err);
         }
     };

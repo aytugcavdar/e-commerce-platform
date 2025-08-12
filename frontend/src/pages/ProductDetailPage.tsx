@@ -4,20 +4,23 @@ import { useGetProductQuery } from '../features/products/productsApiSlice';
 import { useAddToCartMutation } from '../features/cart/cartApiSlice';
 import { toast } from 'react-toastify';
 import { ApiResponse, Product } from '../../types';
+import { useNotify } from '../hooks/useNotify';
+
 
 const ProductDetailPage: React.FC = () => {
     const { productId } = useParams<{ productId: string }>();
     const { data: productData, isLoading, isError } = useGetProductQuery<ApiResponse<Product>>(productId!);
     const [addToCart, { isLoading: isAddingToCart }] = useAddToCartMutation();
     const [quantity, setQuantity] = useState(1);
+    const notify = useNotify();
 
     const handleAddToCart = async () => {
         if (!productId || !productData?.data || productData.data.stock === 0) return;
         try {
             await addToCart({ productId, quantity }).unwrap();
-            toast.success(`${quantity} adet ürün sepete eklendi!`);
+            notify.success(`${quantity} adet ürün sepete eklendi!`);
         } catch (err) {
-            toast.error('Ürün sepete eklenemedi.');
+            notify.error('Ürün sepete eklenemedi.');
         }
     };
 

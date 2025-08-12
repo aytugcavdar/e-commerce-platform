@@ -3,12 +3,11 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGetOrderByIdQuery } from '../features/orders/orderApiSlice';
 import { useProcessPaymentMutation } from '../features/payment/paymentApiSlice';
-import { toast } from 'react-toastify';
-
+import { useNotify } from '../hooks/useNotify';
 const PaymentPage: React.FC = () => {
     const { orderId } = useParams<{ orderId: string }>();
     const navigate = useNavigate();
-
+    const notify = useNotify();
     // Sipariş detaylarını al
     const { data: orderData, isLoading: isLoadingOrder, isError } = useGetOrderByIdQuery(orderId!);
     // Ödeme işlemini tetikleyecek mutation
@@ -20,17 +19,16 @@ const PaymentPage: React.FC = () => {
         try {
             await processPayment({
                 orderId: orderData.data._id,
-                paymentMethod: orderData.data.paymentMethod // veya formdan alınabilir
+                paymentMethod: orderData.data.paymentMethod
             }).unwrap();
 
-            toast.success('Ödeme başarıyla tamamlandı!');
-            navigate(`/profile/orders/${orderId}`); // Sipariş detay sayfasına yönlendir
+            notify.success('Ödeme başarıyla tamamlandı!');
+            navigate(`/profile/orders/${orderId}`);
         } catch (err) {
-            toast.error('Ödeme sırasında bir hata oluştu.');
+            notify.error('Ödeme sırasında bir hata oluştu.');
             console.error('Ödeme hatası:', err);
         }
     };
-
     if (isLoadingOrder) return <div className="text-center"><span className="loading loading-lg"></span></div>;
     if (isError || !orderData?.data) return <div className="text-center text-red-500">Sipariş detayları yüklenemedi.</div>;
 

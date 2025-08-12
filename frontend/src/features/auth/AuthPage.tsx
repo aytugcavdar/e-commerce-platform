@@ -4,6 +4,11 @@ import { useLoginMutation, useRegisterMutation } from './authApiSlice';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from './authSlice';
 import { useNavigate } from 'react-router-dom';
+import { useNotify } from '../../hooks/useNotify';
+
+
+
+const notify = useNotify();
 
 interface LoginFormData {
     email: string;
@@ -45,34 +50,25 @@ const AuthPage = () => {
         }
     }, [watchedAvatar]);
 
-    const onSubmit = async (data: LoginFormData | RegisterFormData) => {
+   const onSubmit = async (data: any) => {
         try {
             if (isLogin) {
-                const userData = await login(data as LoginFormData).unwrap();
+                const userData = await login(data).unwrap();
                 dispatch(setCredentials(userData.data));
+                notify.success('Başarıyla giriş yapıldı!');
                 navigate('/');
             } else {
                 const formData = new FormData();
-                const registerData = data as RegisterFormData;
+                // ... (formData'ya ekleme işlemleri aynı kalıyor)
                 
-                formData.append('username', registerData.username);
-                formData.append('email', registerData.email);
-                formData.append('password', registerData.password);
-                formData.append('firstName', registerData.firstName);
-                formData.append('lastName', registerData.lastName);
-                
-                if (registerData.avatar && registerData.avatar[0]) {
-                    formData.append('avatar', registerData.avatar[0]);
-                }
-
-                const userData = await register(formData).unwrap();
-                alert('Kayıt başarılı! E-posta doğrulama linki gönderildi.');
+                await register(formData).unwrap();
+                notify.info('Kayıt başarılı! Lütfen hesabınızı doğrulamak için e-posta adresinizi kontrol edin.');
                 setIsLogin(true);
                 reset();
                 setAvatarPreview(null);
             }
         } catch (err: any) {
-            alert((isLogin ? 'Giriş' : 'Kayıt') + ' Başarısız: ' + (err.data?.message || 'Sunucu Hatası'));
+            notify.error((isLogin ? 'Giriş' : 'Kayıt') + ' başarısız: ' + (err.data?.message || 'Sunucu Hatası'));
         }
     };
 

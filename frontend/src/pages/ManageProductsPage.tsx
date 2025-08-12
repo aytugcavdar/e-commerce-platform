@@ -1,20 +1,21 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useGetProductsQuery, useDeleteProductMutation } from '../features/products/productsApiSlice';
-import { toast } from 'react-toastify';
 import { Product, ApiResponse } from '../types';
+import { useNotify } from '../hooks/useNotify';
 
 const ManageProductsPage: React.FC = () => {
     const { data: productsData, isLoading, isError } = useGetProductsQuery<ApiResponse<Product[]>>();
     const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
+    const notify = useNotify();
 
     const handleDelete = async (id: string) => {
         if (window.confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
             try {
                 await deleteProduct(id).unwrap();
-                toast.success('Ürün başarıyla silindi.');
+                notify.success('Ürün başarıyla silindi.');
             } catch (err) {
-                toast.error('Ürün silinirken bir hata oluştu.');
+                notify.error('Ürün silinirken bir hata oluştu.');
                 console.error('Silme hatası:', err);
             }
         }
