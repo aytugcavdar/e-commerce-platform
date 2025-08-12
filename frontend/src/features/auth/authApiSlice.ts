@@ -20,8 +20,16 @@ export const authApiSlice = apiSlice.injectEndpoints({
             query: () => '/auth/me',
             providesTags: ['User']
         }),
+         updateMe: builder.mutation<ApiResponse<{ user: User }>, FormData>({
+            query: (formData) => ({
+                url: '/users/updateme', // DİKKAT: Yeni rotayı kullanıyoruz
+                method: 'PUT',
+                body: formData,
+            }),
+            invalidatesTags: ['User'] // Kullanıcı verisini geçersiz kıl ve yeniden çekilmesini sağla
+        }),
     })
 });
 
 // RTK Query, bizim için otomatik olarak hook'lar oluşturur:
-export const { useLoginMutation, useRegisterMutation, useGetMeQuery } = authApiSlice;
+export const { useLoginMutation, useRegisterMutation, useGetMeQuery, useUpdateMeMutation } = authApiSlice;

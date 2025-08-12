@@ -1,73 +1,127 @@
-// cart-service/server.js
+const express = require("express");
+const dotenv = require("dotenv");
+const morgan = require("morgan");
+const cors = require("cors");
+const mongoose = require("mongoose");
+const cookieParser = require("cookie-parser");
+const colors = require("colors");
+const amqp = require("amqplib"); // RabbitMQ
 
-const express = require('express');
-const dotenv = require('dotenv');
-const morgan = require('morgan');
-const cors = require('cors');
-const mongoose = require('mongoose');
-const cookieParser = require('cookie-parser');
-const colors = require('colors');
-const amqp = require('amqplib'); // RabbitMQ
-
-const { errorHandler } = require('@e-commerce/shared-utils');
-const cartRoutes = require('./routes/cart');
-const Cart = require('./models/Cart'); // Kendi modelini import et
-
-dotenv.config({ path: './.env' });
+const { errorHandler } = require("@e-commerce/shared-utils");
+const cartRoutes = require("./routes/cart");
+const Cart = require("./models/Cart");
+const ProductCache = require("./models/ProductCache");
+dotenv.config({ path: "./.env" });
 
 mongoose.connect(process.env.MONGO_URI);
-console.log(colors.bold.underline.cyan(`CartDB Bağlandı: ${mongoose.connection.host}`));
+console.log(
+  colors.bold.underline.cyan(`CartDB Bağlandı: ${mongoose.connection.host}`)
+);
 
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-
-if (process.env.NODE_ENV === 'development') {
-    app.use(morgan('dev'));
+if (process.env.NODE_ENV === "development") {
+  app.use(morgan("dev"));
 }
 
-app.use('/', cartRoutes);
+app.use("/", cartRoutes);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5005;
 
 const server = app.listen(
-    PORT,
-    console.log(`${process.env.NODE_ENV} modunda çalışan Cart Service ${PORT} portunda dinleniyor`.yellow.bold)
+  PORT,
+  console.log(
+    `${process.env.NODE_ENV} modunda çalışan Cart Service ${PORT} portunda dinleniyor`
+      .yellow.bold
+  )
 );
 
 // RabbitMQ Dinleyicisini Başlat
 async function startOrderCreatedListener() {
-    try {
-        const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://guest:guest@localhost');
-        const channel = await connection.createChannel();
-        const queueName = 'order.created';
-        
-        await channel.assertQueue(queueName, { durable: true });
-        console.log(`[Cart-Service] "${queueName}" kuyruğu dinleniyor.`.green);
+  try {
+    const connection = await amqp.connect(
+      process.env.AMQP_URL || "amqp://guest:guest@localhost"
+    );
+    const channel = await connection.createChannel();
+    const queueName = "order.created";
+    const productCreatedQueue = "product.created";
+    const productUpdatedQueue = "product.updated";
+    const productDeletedQueue = "product.deleted";
 
-        channel.consume(queueName, async (msg) => {
-            if (msg !== null) {
-                const { user } = JSON.parse(msg.content.toString());
-                console.log(`[Cart-Service] Sipariş sonrası ${user.id} ID'li kullanıcının sepetini temizleme işlemi alındı.`.cyan);
-                
-                await Cart.findOneAndDelete({ userId: user.id });
-                console.log(`[Cart-Service] Sepet temizlendi.`.cyan.bold);
-                
-                channel.ack(msg);
-            }
-        });
-    } catch (error) {
-        console.error("[Cart-Service] RabbitMQ bağlantı hatası:", error);
-    }
+    await channel.assertQueue(productCreatedQueue, { durable: true });
+    await channel.assertQueue(productUpdatedQueue, { durable: true });
+    await channel.assertQueue(productDeletedQueue, { durable: true });
+
+    await channel.assertQueue(queueName, { durable: true });
+    console.log(`[Cart-Service] "${queueName}" kuyruğu dinleniyor.`.green);
+    console.log("[Cart-Service] Ürün kuyrukları dinleniyor...".green);
+
+    const upsertProduct = async (msg) => {
+      if (msg) {
+        const { product } = JSON.parse(msg.content.toString());
+        await ProductCache.findByIdAndUpdate(
+          product._id,
+          {
+            name: product.name,
+            price: product.price,
+            stock: product.stock,
+            image:
+              product.images && product.images[0]
+                ? product.images[0].url
+                : null,
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        console.log(
+          `[Cart-Service] Product cache güncellendi: ${product.name}`.cyan
+        );
+        channel.ack(msg);
+      }
+    };
+
+    // Ürün silindiğinde
+    const deleteProduct = async (msg) => {
+      if (msg) {
+        const { productId } = JSON.parse(msg.content.toString());
+        await ProductCache.findByIdAndDelete(productId);
+        console.log(
+          `[Cart-Service] Product cache'den silindi: ${productId}`.cyan
+        );
+        channel.ack(msg);
+      }
+    };
+
+    channel.consume(productCreatedQueue, upsertProduct);
+    channel.consume(productUpdatedQueue, upsertProduct);
+    channel.consume(productDeletedQueue, deleteProduct);
+
+    channel.consume(queueName, async (msg) => {
+      if (msg !== null) {
+        const { user } = JSON.parse(msg.content.toString());
+        console.log(
+          `[Cart-Service] Sipariş sonrası ${user.id} ID'li kullanıcının sepetini temizleme işlemi alındı.`
+            .cyan
+        );
+
+        await Cart.findOneAndDelete({ userId: user.id });
+        console.log(`[Cart-Service] Sepet temizlendi.`.cyan.bold);
+
+        channel.ack(msg);
+      }
+    });
+  } catch (error) {
+    console.error("[Cart-Service] RabbitMQ bağlantı hatası:", error);
+  }
 }
 
-server.on('listening', () => {
-    startOrderCreatedListener();
+server.on("listening", () => {
+  startOrderCreatedListener();
 });
 
-process.on('unhandledRejection', (err, promise) => {
-    console.log(`Unhandled Rejection Hatası: ${err.message}`.red);
-    server.close(() => process.exit(1));
+process.on("unhandledRejection", (err, promise) => {
+  console.log(`Unhandled Rejection Hatası: ${err.message}`.red);
+  server.close(() => process.exit(1));
 });

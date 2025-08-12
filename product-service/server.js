@@ -9,6 +9,7 @@ const cloudinary = require('cloudinary').v2;
 const amqp = require('amqplib');
 const Product = require('./models/Product');
 
+
 // .env dosyasını yükle
 dotenv.config({ path: './.env' });
 

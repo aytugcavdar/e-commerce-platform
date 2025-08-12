@@ -29,6 +29,11 @@ app.use('/api/auth', createProxyMiddleware({
     target: 'http://localhost:5001',
     pathRewrite: { '^/api/auth': '/' },
 }));
+app.use('/api/users', createProxyMiddleware({
+    ...commonProxyOptions,
+    target: "http://auth-service:5001",
+    pathRewrite: { "^/api/users": "/users" },
+}));
 
 app.use('/api/products', createProxyMiddleware({
     ...commonProxyOptions,

@@ -8,14 +8,14 @@ import { useUpdateMeMutation } from '../../features/auth/authApiSlice';
 import { setCredentials } from '../../features/auth/authSlice';
 // Değişiklik: Merkezi tipleri import ediyoruz
 import { User, ProfileUpdateFormData } from '../../types';
-
+import { useNotify } from '../../hooks/useNotify';
 
 const EditProfilePage: React.FC = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { user } = useSelector((state: RootState) => state.auth);
     const [updateMe, { isLoading }] = useUpdateMeMutation();
-
+    const { notify } = useNotify();
     const { register, handleSubmit, formState: { errors, isDirty } } = useForm<ProfileUpdateFormData>({
         defaultValues: {
             firstName: user?.firstName || '',
@@ -27,7 +27,7 @@ const EditProfilePage: React.FC = () => {
     const onSubmit: SubmitHandler<ProfileUpdateFormData> = async (data) => {
         const formData = new FormData();
 
-        // Sadece değişen alanları form verisine ekle
+        // Sadece değişen alanları ve avatarı form verisine ekle
         if (data.firstName !== user?.firstName) formData.append('firstName', data.firstName);
         if (data.lastName !== user?.lastName) formData.append('lastName', data.lastName);
         if (data.username !== user?.username) formData.append('username', data.username);
@@ -37,19 +37,20 @@ const EditProfilePage: React.FC = () => {
         
         // Güncellenecek bir şey yoksa işlemi durdur
         if (!isDirty && !(data.avatar && data.avatar.length > 0)) {
-             toast.info('Değişiklik yapılmadı.');
-             return;
+            notify.info('Değişiklik yapılmadı.');
+            return;
         }
 
         try {
             const result = await updateMe(formData).unwrap();
             const updatedUser: User = result.data.user;
 
-            dispatch(setCredentials({ user: updatedUser, token: 'token_from_cookie' }));
-            toast.success('Profil başarıyla güncellendi!');
+            // Redux state'ini güncelle
+            dispatch(setCredentials({ user: updatedUser, token: 'token_from_cookie' })); 
+            notify.success('Profil başarıyla güncellendi!');
             navigate('/profile');
         } catch (err) {
-            toast.error('Profil güncellenirken bir hata oluştu.');
+            notify.error('Profil güncellenirken bir hata oluştu.');
             console.error(err);
         }
     };

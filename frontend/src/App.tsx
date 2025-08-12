@@ -23,6 +23,7 @@ import PaymentPage from './pages/PaymentPage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import ManageOrdersPage from './pages/ManageOrdersPage';
 import EditProductPage from './pages/EditProductPage';
+import ManageUsersPage from './pages/ManageUsersPage';
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
                 <Route path="/admin/products" element={<ManageProductsPage />} />
                 <Route path="/admin/orders" element={<ManageOrdersPage />} />
                  <Route path="/admin/products/edit/:productId" element={<EditProductPage />} />
+                 <Route path="/admin/users" element={<ManageUsersPage />} />
               </Route>
             </Route>
           </Routes>

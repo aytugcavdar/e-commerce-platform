@@ -5,6 +5,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const { errorHandler } = require('@e-commerce/shared-utils');
 const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
 const cookieParser = require('cookie-parser');
 const colors = require('colors');
 
@@ -101,6 +102,7 @@ app.post('/register-test', async (req, res) => {
 });
 
 app.use('/', authRoutes);
+app.use('/users', userRoutes);
 
 // Error handler en sonda olmalı
 app.use(errorHandler);

@@ -24,8 +24,8 @@ const AdminDashboard: React.FC = () => {
       icon: "🛒",
       color: "bg-gradient-to-br from-purple-500 to-purple-600"
     },
-    {
-      to: "/admin/users",
+     {
+      to: "/admin/users", 
       title: "Kullanıcıları Yönet",
       description: "Müşteri hesaplarını yönet ve düzenle.",
       icon: "👥",

@@ -20,6 +20,7 @@ exports.getCart = asyncHandler(async (req, res, next) => {
     res.status(200).json({ success: true, data: cart });
 });
 
+
 // @desc    Sepete ürün ekle veya adedini güncelle
 // @route   POST /api/cart
 // @access  Private
@@ -27,58 +28,40 @@ exports.addItemToCart = asyncHandler(async (req, res, next) => {
     const { productId, quantity } = req.body;
     const userId = req.user.id;
 
-    // --- SERVİSLER ARASI İLETİŞİM ---
-    // 1. Product Service'ten ürün bilgilerini iste
-    // DÜZELTİLDİ: Doğru URL kullanıldı
-    let product;
-    try {
-        console.log(`🔍 Product Service'ten ürün bilgisi isteniyor: ${productId}`);
-        const { data } = await axios.get(`http://localhost:5002/${productId}`, {
-            timeout: 5000 // 5 saniye timeout
-        });
-        product = data.data;
-        console.log(`✅ Ürün bilgisi alındı:`, product.name);
-    } catch (err) {
-        console.error(`❌ Product Service hatası:`, {
-            productId,
-            message: err.message,
-            status: err.response?.status,
-            data: err.response?.data
-        });
-        return next(new ErrorResponse(`ID'si ${productId} olan ürün bulunamadı veya Product Service'e ulaşılamadı.`, 404));
-    }
-    // --------------------------------
+    // --- DEĞİŞİKLİK: Product Service'e gitmek yerine lokal cache'i kullan ---
+    const product = await ProductCache.findById(productId);
 
-    // 2. Kullanıcının sepetini bul veya yeni bir sepet oluştur
+    if (!product) {
+        return next(new ErrorResponse(`ID'si ${productId} olan ürün bulunamadı.`, 404));
+    }
+    
+    if (product.stock < quantity) {
+        return next(new ErrorResponse('Yetersiz stok.', 400));
+    }
+    // --------------------------------------------------------------------
+
     let cart = await Cart.findOne({ userId });
     if (!cart) {
         cart = await Cart.create({ userId });
-        console.log(`🆕 Yeni sepet oluşturuldu: ${userId}`);
     }
 
-    // 3. Ürünün sepette olup olmadığını kontrol et
     const itemIndex = cart.items.findIndex(item => item.productId.toString() === productId);
 
     if (itemIndex > -1) {
-        // Ürün sepette zaten var, sadece miktarını güncelle
         cart.items[itemIndex].quantity = quantity;
-        console.log(`🔄 Ürün miktarı güncellendi: ${product.name} x${quantity}`);
     } else {
-        // Ürün sepette yok, yeni bir ürün olarak ekle
         cart.items.push({
             productId,
             name: product.name,
             price: product.price,
             quantity,
-            image: product.images && product.images[0] ? product.images[0].url : null // Güvenli erişim
+            image: product.image
         });
-        console.log(`➕ Yeni ürün sepete eklendi: ${product.name} x${quantity}`);
     }
 
     cart.modifiedOn = Date.now();
     await cart.save();
 
-    console.log(`💾 Sepet kaydedildi. Toplam ürün sayısı: ${cart.items.length}`);
     res.status(200).json({ success: true, data: cart });
 });
 
