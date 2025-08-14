@@ -29,4 +29,6 @@ router.route('/:id/status').put(authorize('admin'), updateOrderStatus);
 
 router.route('/:id/pay').put(protect, updateOrderToPaid);
 
+
+
 module.exports = router;

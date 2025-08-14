@@ -1,246 +1,132 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useLoginMutation, useRegisterMutation } from './authApiSlice';
-import { useDispatch } from 'react-redux';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useLoginMutation, useRegisterUserMutation } from './authApiSlice';
 import { setCredentials } from './authSlice';
+import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { useNotify } from '../../hooks/useNotify';
-
-
-
-const notify = useNotify();
-
-interface LoginFormData {
-    email: string;
-    password: string;
-}
-
-interface RegisterFormData {
-    username: string;
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    avatar?: FileList;
-}
+import { toast } from 'react-toastify';
+import { loginSchema, registerSchema, LoginFormValues, RegisterFormValues } from './authSchema'; // Bu dosyayı oluşturduğunuzdan emin olun
 
 const AuthPage = () => {
-    const [isLogin, setIsLogin] = useState(true);
-    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-    
-    const { register: registerField, handleSubmit, reset, watch } = useForm();
-    const [login, { isLoading: loginLoading }] = useLoginMutation();
-    const [register, { isLoading: registerLoading }] = useRegisterMutation();
-    const dispatch = useDispatch();
-    const navigate = useNavigate();
+  const [isLogin, setIsLogin] = useState(true);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
-    const watchedAvatar = watch('avatar');
+  const [login, { isLoading: isLoginLoading }] = useLoginMutation();
+  const [registerUser, { isLoading: isRegisterLoading }] = useRegisterUserMutation();
 
-    // Avatar önizleme
-    React.useEffect(() => {
-        if (watchedAvatar && watchedAvatar[0]) {
-            const file = watchedAvatar[0];
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setAvatarPreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        } else {
-            setAvatarPreview(null);
-        }
-    }, [watchedAvatar]);
+  // React Hook Form kurulumu
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset, // Formu temizlemek için
+  } = useForm<LoginFormValues | RegisterFormValues>({
+    // isLogin state'ine göre dinamik olarak doğru validasyon şemasını seçiyoruz
+    resolver: zodResolver(isLogin ? loginSchema : registerSchema),
+    // Varsayılan değerler, form değiştirildiğinde hataları temizlemek için
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+    }
+  });
 
-   const onSubmit = async (data: any) => {
-        try {
-            if (isLogin) {
-                const userData = await login(data).unwrap();
-                dispatch(setCredentials(userData.data));
-                notify.success('Başarıyla giriş yapıldı!');
-                navigate('/');
-            } else {
-                const formData = new FormData();
-                // ... (formData'ya ekleme işlemleri aynı kalıyor)
-                
-                await register(formData).unwrap();
-                notify.info('Kayıt başarılı! Lütfen hesabınızı doğrulamak için e-posta adresinizi kontrol edin.');
-                setIsLogin(true);
-                reset();
-                setAvatarPreview(null);
-            }
-        } catch (err: any) {
-            notify.error((isLogin ? 'Giriş' : 'Kayıt') + ' başarısız: ' + (err.data?.message || 'Sunucu Hatası'));
-        }
-    };
+  // Form gönderildiğinde react-hook-form tarafından çağrılacak fonksiyon
+  const onSubmit = async (data: LoginFormValues | RegisterFormValues) => {
+    try {
+      if (isLogin) {
+        const userData = await login(data as LoginFormValues).unwrap();
+        dispatch(setCredentials({ ...userData }));
+        navigate('/');
+        toast.success('Başarıyla giriş yapıldı!');
+      } else {
+        await registerUser(data as RegisterFormValues).unwrap();
+        toast.success('Kayıt başarılı! Lütfen giriş yapın.');
+        setIsLogin(true); // Kayıttan sonra giriş ekranına yönlendir
+      }
+      reset(); // Formu temizle
+    } catch (err: any) {
+      toast.error(err.data?.message || 'Bir hata oluştu');
+    }
+  };
 
-    const toggleMode = () => {
-        setIsLogin(!isLogin);
-        reset();
-        setAvatarPreview(null);
-    };
+  const toggleAuthMode = () => {
+    setIsLogin(!isLogin);
+    reset(); // Form modunu değiştirirken hataları ve inputları temizle
+  };
 
-    return (
-        <div className="min-h-screen bg-base-200 flex items-center justify-center p-4">
-            <div className="card w-full max-w-md bg-base-100 shadow-xl">
-                <div className="card-body">
-                    {/* Header */}
-                    <div className="text-center mb-4">
-                        <h2 className="text-2xl font-bold">
-                            {isLogin ? 'Giriş Yap' : 'Hesap Oluştur'}
-                        </h2>
-                        <p className="text-base-content/70 text-sm mt-1">
-                            {isLogin ? 'Hesabınıza giriş yapın' : 'Yeni hesap oluşturun'}
-                        </p>
-                    </div>
+  return (
+    <div className="flex justify-center items-center min-h-screen bg-base-200">
+      <div className="card w-full max-w-sm shrink-0 bg-base-100 shadow-2xl">
+        {/* handleSubmit fonksiyonu önce Zod validasyonunu çalıştırır.
+            Eğer validasyon başarılı olursa, bizim onSubmit fonksiyonumuzu çağırır. */}
+        <form onSubmit={handleSubmit(onSubmit)} className="card-body">
+          <h2 className="card-title text-2xl font-bold text-center mb-4">
+            {isLogin ? 'Giriş Yap' : 'Kayıt Ol'}
+          </h2>
 
-                    {/* Form */}
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                        {/* Register Only Fields */}
-                        {!isLogin && (
-                            <>
-                                {/* Avatar Upload */}
-                                <div className="form-control">
-                                    <label className="label">
-                                        <span className="label-text">Profil Fotoğrafı</span>
-                                        <span className="label-text-alt text-xs">(Opsiyonel)</span>
-                                    </label>
-                                    <div className="flex items-center space-x-4">
-                                        <div className="avatar">
-                                            <div className="w-16 h-16 rounded-full bg-base-300">
-                                                {avatarPreview ? (
-                                                    <img src={avatarPreview} alt="Preview" className="rounded-full" />
-                                                ) : (
-                                                    <div className="flex items-center justify-center h-full text-base-content/50">
-                                                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                                                        </svg>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="file-input file-input-sm file-input-bordered flex-1"
-                                            {...registerField('avatar')}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Name Fields */}
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="form-control">
-                                        <label className="label">
-                                            <span className="label-text">Ad</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            placeholder="Adınız"
-                                            className="input input-bordered input-sm"
-                                            {...registerField('firstName', { required: !isLogin })}
-                                        />
-                                    </div>
-                                    <div className="form-control">
-                                        <label className="label">
-                                            <span className="label-text">Soyad</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            placeholder="Soyadınız"
-                                            className="input input-bordered input-sm"
-                                            {...registerField('lastName', { required: !isLogin })}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Username */}
-                                <div className="form-control">
-                                    <label className="label">
-                                        <span className="label-text">Kullanıcı Adı</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="kullanici_adi"
-                                        className="input input-bordered"
-                                        {...registerField('username', { required: !isLogin })}
-                                    />
-                                </div>
-                            </>
-                        )}
-
-                        {/* Email */}
-                        <div className="form-control">
-                            <label className="label">
-                                <span className="label-text">E-posta</span>
-                            </label>
-                            <input
-                                type="email"
-                                placeholder="eposta@adresiniz.com"
-                                className="input input-bordered"
-                                {...registerField('email', { required: true })}
-                            />
-                        </div>
-
-                        {/* Password */}
-                        <div className="form-control">
-                            <label className="label">
-                                <span className="label-text">Şifre</span>
-                            </label>
-                            <input
-                                type="password"
-                                placeholder="Şifreniz"
-                                className="input input-bordered"
-                                {...registerField('password', { required: true, minLength: 6 })}
-                            />
-                            {!isLogin && (
-                                <label className="label">
-                                    <span className="label-text-alt text-xs">En az 6 karakter</span>
-                                </label>
-                            )}
-                        </div>
-
-                        {/* Submit Button */}
-                        <div className="form-control mt-6">
-                            <button 
-                                type="submit" 
-                                className="btn btn-primary" 
-                                disabled={loginLoading || registerLoading}
-                            >
-                                {(loginLoading || registerLoading) ? (
-                                    <>
-                                        <span className="loading loading-spinner loading-sm"></span>
-                                        {isLogin ? 'Giriş yapılıyor...' : 'Kayıt oluşturuluyor...'}
-                                    </>
-                                ) : (
-                                    isLogin ? 'Giriş Yap' : 'Hesap Oluştur'
-                                )}
-                            </button>
-                        </div>
-                    </form>
-
-                    {/* Toggle Mode */}
-                    <div className="divider text-xs">VEYA</div>
-                    <div className="text-center">
-                        <button
-                            type="button"
-                            onClick={toggleMode}
-                            className="btn btn-ghost btn-sm"
-                        >
-                            {isLogin ? 'Hesabınız yok mu? Kayıt olun' : 'Zaten hesabınız var mı? Giriş yapın'}
-                        </button>
-                    </div>
-
-                    {/* Forgot Password Link (only for login) */}
-                    {isLogin && (
-                        <div className="text-center mt-2">
-                            <button type="button" className="btn btn-ghost btn-xs text-base-content/70">
-                                Şifremi Unuttum
-                            </button>
-                        </div>
-                    )}
-                </div>
+          {!isLogin && (
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">İsim</span>
+              </label>
+              <input
+                type="text"
+                placeholder="İsminizi girin"
+                className={`input input-bordered ${errors.name ? 'input-error' : ''}`}
+                {...register('name')}
+              />
+              {errors.name && <span className="text-error text-xs mt-1">{errors.name.message}</span>}
             </div>
-        </div>
-    );
+          )}
+
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Email</span>
+            </label>
+            <input
+              type="email"
+              placeholder="email@example.com"
+              className={`input input-bordered ${errors.email ? 'input-error' : ''}`}
+              {...register('email')}
+            />
+            {errors.email && <span className="text-error text-xs mt-1">{errors.email.message}</span>}
+          </div>
+
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Şifre</span>
+            </label>
+            <input
+              type="password"
+              placeholder="******"
+              className={`input input-bordered ${errors.password ? 'input-error' : ''}`}
+              {...register('password')}
+            />
+            {errors.password && <span className="text-error text-xs mt-1">{errors.password.message}</span>}
+          </div>
+          
+          <div className="form-control mt-6">
+            <button className="btn btn-primary" type="submit" disabled={isLoginLoading || isRegisterLoading}>
+              {isLogin ? 'Giriş Yap' : 'Kayıt Ol'}
+            </button>
+          </div>
+          
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={toggleAuthMode}
+              className="link link-hover text-sm"
+            >
+              {isLogin ? 'Hesabınız yok mu? Kayıt Olun' : 'Zaten bir hesabınız var mı? Giriş Yapın'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 };
 
 export default AuthPage;
