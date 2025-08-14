@@ -40,8 +40,8 @@ app.use('/api/auth', createProxyMiddleware({
 // Users servis
 app.use('/api/users', createProxyMiddleware({
     ...commonProxyOptions,
-    target: "http://localhost:5001",
-    pathRewrite: { "^/api/users": "/users" },
+    target: "http://localhost:5001/users", // Target'a /users yolunu ekleyin
+    pathRewrite: { "^/api/users": "" },    // Gelen yolu tamamen kaldırın
     logLevel: 'debug', 
     onProxyReq: (proxyReq, req, res) => {
         console.log(`🔄 Users Proxy - Original: ${req.originalUrl} -> Target: ${proxyReq.path}`);
