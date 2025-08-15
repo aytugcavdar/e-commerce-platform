@@ -70,35 +70,33 @@ exports.getCategory = asyncHandler(async (req, res, next) => {
 // @route   POST /api/categories
 // @access  Private/Admin
 exports.createCategory = asyncHandler(async (req, res, next) => {
-    // Kategoriyi oluşturan kullanıcının ID'sini req.user'dan al
     req.body.user = req.user.id;
+    const parent = req.body.parent || null; 
 
-    // Eğer bir üst kategori (parent) belirtilmişse, var olup olmadığını kontrol et
-    if (req.body.parent) {
-        const parentCategory = await Category.findById(req.body.parent);
+    if (parent) {
+        const parentCategory = await Category.findById(parent);
         if (!parentCategory) {
-            return next(new ErrorResponse(`Üst kategori (ID: ${req.body.parent}) bulunamadı`, 404));
+            return next(new ErrorResponse(`Üst kategori (ID: ${parent}) bulunamadı`, 404));
         }
-
-        // Alt kategorinin altında başka alt kategori olmasını önle (sadece 2 seviye)
         if (parentCategory.parent) {
             return next(new ErrorResponse('Alt kategorinin altında başka alt kategori oluşturamazsınız', 400));
         }
     }
 
-    // Aynı isimde kategori var mı kontrol et
+    // Aynı ana kategori altında bu isimde bir kategori var mı kontrol et
     const existingCategory = await Category.findOne({ 
         name: req.body.name,
-        parent: req.body.parent || null 
+        parent: parent
     });
 
     if (existingCategory) {
-        return next(new ErrorResponse('Bu isimde bir kategori zaten mevcut', 400));
+        return next(new ErrorResponse('Bu üst kategori altında aynı isimde bir kategori zaten mevcut', 400));
     }
-
+    
+    // req.body.parent'ı da güncelle
+    req.body.parent = parent;
     const category = await Category.create(req.body);
 
-    // Oluşturulan kategoriyi populate ile geri döndür
     const populatedCategory = await Category.findById(category._id)
         .populate('parent', 'name slug');
 

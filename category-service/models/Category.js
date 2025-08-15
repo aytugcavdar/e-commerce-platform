@@ -5,8 +5,8 @@ const CategorySchema = new mongoose.Schema({
     name: {
         type: String,
         required: [true, 'Lütfen bir kategori adı girin'],
-        trim: true,
-        unique: true
+        trim: true
+        
     },
     slug: String,
     description: {
@@ -15,10 +15,9 @@ const CategorySchema = new mongoose.Schema({
     },
     parent: {
         type: mongoose.Schema.ObjectId,
-        ref: 'Category', // Kendisine referans vererek alt kategori yapısını kurar
+        ref: 'Category',
         default: null
     },
-    // Bu kategoriyi oluşturan admin
     user: {
         type: mongoose.Schema.ObjectId,
         required: true
@@ -43,9 +42,9 @@ CategorySchema.virtual('children', {
     justOne: false
 });
 
-
-
 // Index'ler
+
+CategorySchema.index({ name: 1, parent: 1 }, { unique: true });
 CategorySchema.index({ slug: 1 });
 CategorySchema.index({ parent: 1 });
 CategorySchema.index({ user: 1 });

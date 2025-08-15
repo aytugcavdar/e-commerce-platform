@@ -1,169 +1,240 @@
-// frontend/src/pages/CategoryAdminPage.tsx
-
-import { useState } from 'react';
-import {
-  useGetCategoriesQuery,
-  useCreateCategoryMutation,
-  useUpdateCategoryMutation,
-  useDeleteCategoryMutation,
+import React, { useState, useMemo } from 'react';
+import { 
+    useGetCategoriesQuery, 
+    useCreateCategoryMutation, 
+    useDeleteCategoryMutation 
 } from '../features/categories/categoryApiSlice';
+import { useNotify } from '../hooks/useNotify';
 import { Category } from '../types/Category';
+import { FaTrash, FaPlus, FaSpinner, FaAngleDown, FaAngleRight } from 'react-icons/fa';
 
-const CategoryAdminPage = () => {
-  const { data: categories, isLoading, isError } = useGetCategoriesQuery({});
-  const [createCategory] = useCreateCategoryMutation();
-  const [updateCategory] = useUpdateCategoryMutation();
-  const [deleteCategory] = useDeleteCategoryMutation();
+// Kategori ağacını oluşturan yardımcı fonksiyon
+const buildCategoryTree = (categories: Category[]): Category[] => {
+    // Çocukları da içerecek şekilde genişletilmiş bir tip tanımı
+    type CategoryWithChildren = Category & { children: CategoryWithChildren[] };
+    
+    const categoryMap: { [key: string]: CategoryWithChildren } = {};
+    const tree: CategoryWithChildren[] = [];
 
-  const [newCategoryName, setNewCategoryName] = useState('');
-  
-  // --- Değişiklik Başlangıcı: State yönetimini refactor ediyoruz ---
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState('');
-  // --- Değişiklik Sonu ---
+    categories.forEach(category => {
+        categoryMap[category._id] = { ...category, children: [] };
+    });
 
-  const [selectedParent, setSelectedParent] = useState('');
-
-  const handleCreateCategory = async () => {
-    if (newCategoryName.trim() !== '') {
-      const parent = selectedParent === '' ? null : selectedParent;
-      await createCategory({ name: newCategoryName, parent });
-      setNewCategoryName('');
-      setSelectedParent('');
-    }
-  };
-
-  // --- Değişiklik Başlangıcı: Güncelleme fonksiyonu yeni state'lere göre düzenlendi ---
-  const handleUpdateCategory = async () => {
-    if (editingId && editingName.trim() !== '') {
-      const parent = selectedParent === '' ? null : selectedParent;
-      await updateCategory({
-        id: editingId, // Artık ID'yi buradan güvenle alıyoruz
-        updatedCategory: { name: editingName, parent },
-      });
-      // Formu temizle
-      setEditingId(null);
-      setEditingName('');
-      setSelectedParent('');
-    }
-  };
-  // --- Değişiklik Sonu ---
-
-  const handleDeleteCategory = async (id: string) => {
-    await deleteCategory(id);
-  };
-  
-  // --- Değişiklik Başlangıcı: Formu temizleme/iptal fonksiyonu ---
-  const cancelEditing = () => {
-    setEditingId(null);
-    setEditingName('');
-    setSelectedParent('');
-  };
-  // --- Değişiklik Sonu ---
-
-  if (isLoading) return <div>Yükleniyor...</div>;
-  if (isError) return <div>Hata oluştu.</div>;
-
-  const isEditing = editingId !== null;
-
-  return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Kategorileri Yönet</h1>
-      <div className="mb-4 p-4 border rounded">
-        <h2 className="text-xl mb-2">
-          {isEditing ? 'Kategoriyi Düzenle' : 'Yeni Kategori Ekle'}
-        </h2>
-        <input
-          type="text"
-          className="border p-2 w-full mb-2"
-          placeholder="Kategori Adı"
-          // --- Değişiklik: value ve onChange yeni state'lere bağlandı ---
-          value={isEditing ? editingName : newCategoryName}
-          onChange={(e) => {
-            if (isEditing) {
-              setEditingName(e.target.value);
-            } else {
-              setNewCategoryName(e.target.value);
+    categories.forEach(category => {
+        if (category.parent?._id) {
+            const parent = categoryMap[category.parent._id];
+            if (parent) {
+                parent.children.push(categoryMap[category._id]);
             }
-          }}
-        />
-        <select
-          className="border p-2 w-full mb-2"
-          value={selectedParent}
-          onChange={(e) => setSelectedParent(e.target.value)}
-        >
-          <option value="">Ana Kategori (Üst Kategorisi Yok)</option>
-          {categories?.data.map((category: Category) => (
-             // Düzenleme modunda kategorinin kendisini parent olarak seçmesini engelle
-            (editingId !== category._id) && (
-              <option key={category._id} value={category._id}>
-                {category.name}
-              </option>
-            )
-          ))}
-        </select>
-        {isEditing ? (
-          <div>
-            <button
-              onClick={handleUpdateCategory}
-              className="bg-blue-500 text-white px-4 py-2 rounded"
-            >
-              Güncelle
-            </button>
-            <button
-              onClick={cancelEditing} // İptal butonu eklendi
-              className="bg-gray-500 text-white px-4 py-2 rounded ml-2"
-            >
-              İptal
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={handleCreateCategory}
-            className="bg-green-500 text-white px-4 py-2 rounded"
-          >
-            Ekle
-          </button>
-        )}
-      </div>
+        } else {
+            tree.push(categoryMap[category._id]);
+        }
+    });
 
-      <h2 className="text-xl mb-2">Mevcut Kategoriler</h2>
-      <ul>
-        {categories?.data.map((category: Category) => (
-          <li
-            key={category._id}
-            className="flex justify-between items-center p-2 border-b"
-          >
-            <div>
-              <span>{category.name}</span>
-              <span className="text-sm text-gray-500 ml-2">
-                {category.parent ? `(${categories.data.find((c: Category) => c._id === category.parent)?.name})` : ''}
-              </span>
+    return tree;
+};
+
+// Kategori listesini hiyerarşik olarak render eden bileşen
+const CategoryTree: React.FC<{ 
+    categories: (Category & { children?: Category[] })[], 
+    onDelete: (id: string) => void, 
+    isLoadingDelete: boolean,
+    level?: number
+}> = ({ categories, onDelete, isLoadingDelete, level = 0 }) => {
+    
+    const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+
+    const toggleCategory = (id: string) => {
+        setOpenCategories(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    return (
+        <>
+            {categories.map(category => (
+                <div key={category._id} style={{ paddingLeft: `${level * 1}rem` }}>
+                    <div className="flex items-center justify-between p-3 my-2 bg-base-200 rounded-lg hover:bg-base-300 transition-colors">
+                        <div className="flex items-center">
+                           {category.children && category.children.length > 0 && (
+                                <button 
+                                    onClick={() => toggleCategory(category._id)} 
+                                    className="btn btn-ghost btn-xs mr-2 text-base-content/60"
+                                >
+                                    {openCategories[category._id] ? <FaAngleDown /> : <FaAngleRight />}
+                                </button>
+                            )}
+                            <span className="font-medium text-base-content">{category.name}</span>
+                        </div>
+                        <button
+                            onClick={() => onDelete(category._id)}
+                            disabled={isLoadingDelete}
+                            className="btn btn-ghost btn-sm text-error hover:text-error hover:bg-error/10"
+                            aria-label={`${category.name} kategorisini sil`}
+                        >
+                            <FaTrash />
+                        </button>
+                    </div>
+                    {category.children && category.children.length > 0 && openCategories[category._id] && (
+                        <CategoryTree 
+                            categories={category.children} 
+                            onDelete={onDelete} 
+                            isLoadingDelete={isLoadingDelete}
+                            level={level + 1}
+                        />
+                    )}
+                </div>
+            ))}
+        </>
+    );
+};
+
+// Ana Sayfa Bileşeni
+const CategoryAdminPage = () => {
+    const { data: categoryResponse, isLoading, isError, refetch } = useGetCategoriesQuery();
+    const [createCategory, { isLoading: isLoadingCreate }] = useCreateCategoryMutation();
+    const [deleteCategory, { isLoadingDelete }] = useDeleteCategoryMutation();
+
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [selectedParent, setSelectedParent] = useState<string | null>(null);
+    
+    useNotify({
+        isSuccess: !isLoadingCreate && !isLoadingDelete,
+        isError: isError,
+        successMessage: 'İşlem başarıyla tamamlandı!',
+        errorMessage: 'Bir hata oluştu, lütfen tekrar deneyin.'
+    });
+
+    const categoryTree = useMemo(() => {
+        if (categoryResponse && Array.isArray(categoryResponse.data)) {
+            return buildCategoryTree(categoryResponse.data);
+        }
+        return [];
+    }, [categoryResponse]);
+    
+    const handleCreateCategory = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newCategoryName.trim() === '') return;
+        
+        try {
+            await createCategory({ name: newCategoryName, parent: selectedParent }).unwrap();
+            setNewCategoryName('');
+            setSelectedParent(null);
+        } catch (err) {
+            console.error('Kategori oluşturulamadı:', err);
+        }
+    };
+
+    const handleDeleteCategory = async (id: string) => {
+        if (window.confirm('Bu kategoriyi silmek istediğinize emin misiniz? Alt kategorileri varsa onlar da silinecektir.')) {
+            try {
+                await deleteCategory(id).unwrap();
+            } catch (err) {
+                 console.error('Kategori silinemedi:', err);
+            }
+        }
+    };
+    
+    const renderCategoryOptions = (categories: (Category & { children?: Category[] })[], level = 0): JSX.Element[] => {
+        return categories.flatMap(category => [
+            <option key={category._id} value={category._id}>
+                {'—'.repeat(level)} {category.name}
+            </option>,
+            ...(category.children && category.children.length > 0
+                ? renderCategoryOptions(category.children, level + 1)
+                : [])
+        ]);
+    };
+
+    return (
+        <div className="container mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Yeni Kategori Ekleme Kartı */}
+            <div className="lg:col-span-1">
+                 <div className="card bg-base-100 shadow-xl">
+                    <div className="card-body">
+                        <h2 className="card-title text-2xl mb-4">Yeni Kategori Ekle</h2>
+                        <form onSubmit={handleCreateCategory}>
+                            <div className="form-control mb-4">
+                                <label className="label" htmlFor="categoryName">
+                                    <span className="label-text font-medium">Kategori Adı</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    id="categoryName"
+                                    value={newCategoryName}
+                                    onChange={(e) => setNewCategoryName(e.target.value)}
+                                    className="input input-bordered w-full"
+                                    placeholder="Örn: Elektronik"
+                                    required
+                                />
+                            </div>
+                            <div className="form-control mb-6">
+                                <label className="label" htmlFor="parentCategory">
+                                    <span className="label-text font-medium">Üst Kategori (İsteğe bağlı)</span>
+                                </label>
+                                <select
+                                    id="parentCategory"
+                                    value={selectedParent || ''}
+                                    onChange={(e) => setSelectedParent(e.target.value || null)}
+                                    className="select select-bordered w-full"
+                                >
+                                    <option value="">— Ana Kategori Olarak Ekle —</option>
+                                    {renderCategoryOptions(categoryTree)}
+                                </select>
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={isLoadingCreate}
+                                className="btn btn-primary w-full"
+                            >
+                                {isLoadingCreate ? (
+                                    <>
+                                        <FaSpinner className="animate-spin mr-2" />
+                                        Ekleniyor...
+                                    </>
+                                ) : (
+                                    <>
+                                        <FaPlus className="mr-2" />
+                                        Ekle
+                                    </>
+                                )}
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
-            <div>
-              <button
-                // --- Değişiklik: Düzenleme state'lerini ayarla ---
-                onClick={() => {
-                  setEditingId(category._id);
-                  setEditingName(category.name);
-                  setSelectedParent(category.parent || '');
-                }}
-                className="bg-yellow-500 text-white px-2 py-1 rounded"
-              >
-                Düzenle
-              </button>
-              <button
-                onClick={() => handleDeleteCategory(category._id)}
-                className="bg-red-500 text-white px-2 py-1 rounded ml-2"
-              >
-                Sil
-              </button>
+
+            {/* Kategori Listesi Kartı */}
+            <div className="lg:col-span-2">
+                <div className="card bg-base-100 shadow-xl">
+                    <div className="card-body">
+                        <h2 className="card-title text-2xl mb-4">Kategori Listesi</h2>
+                        {isLoading && (
+                            <div className="flex items-center justify-center p-8">
+                                <FaSpinner className="animate-spin text-2xl text-primary mr-3" />
+                                <span className="text-lg">Yükleniyor...</span>
+                            </div>
+                        )}
+                        {isError && (
+                            <div className="alert alert-error">
+                                <span>Kategoriler yüklenirken bir hata oluştu.</span>
+                            </div>
+                        )}
+                        {!isLoading && !isError && categoryTree.length === 0 && (
+                            <div className="alert alert-info">
+                                <span>Henüz hiç kategori eklenmemiş.</span>
+                            </div>
+                        )}
+                        {!isLoading && !isError && categoryTree.length > 0 && (
+                             <CategoryTree 
+                                 categories={categoryTree} 
+                                 onDelete={handleDeleteCategory} 
+                                 isLoadingDelete={isLoadingDelete} 
+                             />
+                        )}
+                    </div>
+                </div>
             </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+        </div>
+    );
 };
 
 export default CategoryAdminPage;
