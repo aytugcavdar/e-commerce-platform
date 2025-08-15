@@ -1,47 +1,42 @@
-import React, { useState, useMemo } from 'react';
-import { 
-    useGetCategoriesQuery, 
-    useCreateCategoryMutation, 
-    useDeleteCategoryMutation 
-} from '../features/categories/categoryApiSlice';
-import { useNotify } from '../hooks/useNotify';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useForm, SubmitHandler } from 'react-hook-form';
+import { FaTrash, FaPlus, FaSpinner, FaAngleDown, FaAngleRight, FaEdit } from 'react-icons/fa';
+import { toast } from 'react-toastify';
+import {
+    useGetCategoriesQuery,
+    useCreateCategoryMutation,
+    useDeleteCategoryMutation,
+    useUpdateCategoryMutation,
+} from '../features/categories/categoryApiSlice'; // <-- HATA BURADAYDI, DÜZELTİLDİ
 import { Category } from '../types/Category';
-import { FaTrash, FaPlus, FaSpinner, FaAngleDown, FaAngleRight } from 'react-icons/fa';
+import { ApiResponse } from '../types/İndex';
 
-// Kategori ağacını oluşturan yardımcı fonksiyon
-const buildCategoryTree = (categories: Category[]): Category[] => {
-    // Çocukları da içerecek şekilde genişletilmiş bir tip tanımı
-    type CategoryWithChildren = Category & { children: CategoryWithChildren[] };
-    
-    const categoryMap: { [key: string]: CategoryWithChildren } = {};
-    const tree: CategoryWithChildren[] = [];
+interface IFormInput {
+    name: string;
+    parent?: string;
+}
 
+const buildCategoryTree = (categories: Category[], parentId: string | null = null): (Category & { children?: Category[] })[] => {
+    const tree: (Category & { children?: Category[] })[] = [];
     categories.forEach(category => {
-        categoryMap[category._id] = { ...category, children: [] };
-    });
-
-    categories.forEach(category => {
-        if (category.parent?._id) {
-            const parent = categoryMap[category.parent._id];
-            if (parent) {
-                parent.children.push(categoryMap[category._id]);
+        if (category.parent === parentId) {
+            const children = buildCategoryTree(categories, category._id);
+            if (children.length > 0) {
+                category.children = children;
             }
-        } else {
-            tree.push(categoryMap[category._id]);
+            tree.push(category);
         }
     });
-
     return tree;
 };
 
-// Kategori listesini hiyerarşik olarak render eden bileşen
-const CategoryTree: React.FC<{ 
-    categories: (Category & { children?: Category[] })[], 
-    onDelete: (id: string) => void, 
-    isLoadingDelete: boolean,
-    level?: number
-}> = ({ categories, onDelete, isLoadingDelete, level = 0 }) => {
-    
+const CategoryTree: React.FC<{
+    categories: (Category & { children?: Category[] })[];
+    onDelete: (id: string) => void;
+    onEdit: (category: Category) => void;
+    isLoadingDelete: boolean;
+    level?: number;
+}> = ({ categories, onDelete, onEdit, isLoadingDelete, level = 0 }) => {
     const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
 
     const toggleCategory = (id: string) => {
@@ -54,29 +49,36 @@ const CategoryTree: React.FC<{
                 <div key={category._id} style={{ paddingLeft: `${level * 1}rem` }}>
                     <div className="flex items-center justify-between p-3 my-2 bg-base-200 rounded-lg hover:bg-base-300 transition-colors">
                         <div className="flex items-center">
-                           {category.children && category.children.length > 0 && (
-                                <button 
-                                    onClick={() => toggleCategory(category._id)} 
-                                    className="btn btn-ghost btn-xs mr-2 text-base-content/60"
-                                >
+                            {category.children && category.children.length > 0 && (
+                                <button onClick={() => toggleCategory(category._id)} className="btn btn-ghost btn-sm mr-2">
                                     {openCategories[category._id] ? <FaAngleDown /> : <FaAngleRight />}
                                 </button>
                             )}
-                            <span className="font-medium text-base-content">{category.name}</span>
+                            <span className="font-semibold">{category.name}</span>
                         </div>
-                        <button
-                            onClick={() => onDelete(category._id)}
-                            disabled={isLoadingDelete}
-                            className="btn btn-ghost btn-sm text-error hover:text-error hover:bg-error/10"
-                            aria-label={`${category.name} kategorisini sil`}
-                        >
-                            <FaTrash />
-                        </button>
+                        <div className="flex items-center">
+                            <button
+                                onClick={() => onEdit(category)}
+                                className="btn btn-ghost btn-sm text-info hover:text-info hover:bg-info/10 mr-2"
+                                aria-label={`${category.name} kategorisini düzenle`}
+                            >
+                                <FaEdit />
+                            </button>
+                            <button
+                                onClick={() => onDelete(category._id)}
+                                disabled={isLoadingDelete}
+                                className="btn btn-ghost btn-sm text-error hover:text-error hover:bg-error/10"
+                                aria-label={`${category.name} kategorisini sil`}
+                            >
+                                <FaTrash />
+                            </button>
+                        </div>
                     </div>
                     {category.children && category.children.length > 0 && openCategories[category._id] && (
-                        <CategoryTree 
-                            categories={category.children} 
-                            onDelete={onDelete} 
+                        <CategoryTree
+                            categories={category.children}
+                            onDelete={onDelete}
+                            onEdit={onEdit}
                             isLoadingDelete={isLoadingDelete}
                             level={level + 1}
                         />
@@ -87,148 +89,118 @@ const CategoryTree: React.FC<{
     );
 };
 
-// Ana Sayfa Bileşeni
 const CategoryAdminPage = () => {
-    const { data: categoryResponse, isLoading, isError, refetch } = useGetCategoriesQuery();
+    const { data: categoryData, isLoading, isError, error } = useGetCategoriesQuery();
     const [createCategory, { isLoading: isLoadingCreate }] = useCreateCategoryMutation();
-    const [deleteCategory, { isLoadingDelete }] = useDeleteCategoryMutation();
+    const [deleteCategory, { isLoading: isLoadingDelete }] = useDeleteCategoryMutation();
+    const [updateCategory, { isLoading: isLoadingUpdate }] = useUpdateCategoryMutation();
 
-    const [newCategoryName, setNewCategoryName] = useState('');
-    const [selectedParent, setSelectedParent] = useState<string | null>(null);
-    
-    useNotify({
-        isSuccess: !isLoadingCreate && !isLoadingDelete,
-        isError: isError,
-        successMessage: 'İşlem başarıyla tamamlandı!',
-        errorMessage: 'Bir hata oluştu, lütfen tekrar deneyin.'
-    });
+    const { register, handleSubmit, reset, setValue } = useForm<IFormInput>();
+    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
     const categoryTree = useMemo(() => {
-        if (categoryResponse && Array.isArray(categoryResponse.data)) {
-            return buildCategoryTree(categoryResponse.data);
+        if (categoryData?.data) {
+            return buildCategoryTree(categoryData.data);
         }
         return [];
-    }, [categoryResponse]);
-    
-    const handleCreateCategory = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newCategoryName.trim() === '') return;
-        
+    }, [categoryData]);
+
+    useEffect(() => {
+        if (editingCategory) {
+            setValue('name', editingCategory.name);
+            setValue('parent', editingCategory.parent || '');
+        } else {
+            reset({ name: '', parent: '' });
+        }
+    }, [editingCategory, setValue, reset]);
+
+    const onSubmit: SubmitHandler<IFormInput> = async (data) => {
         try {
-            await createCategory({ name: newCategoryName, parent: selectedParent }).unwrap();
-            setNewCategoryName('');
-            setSelectedParent(null);
+            const payload = { ...data, parent: data.parent || null };
+            if (editingCategory) {
+                await updateCategory({ _id: editingCategory._id, ...payload }).unwrap();
+                toast.success('Kategori başarıyla güncellendi!');
+                setEditingCategory(null);
+            } else {
+                await createCategory(payload).unwrap();
+                toast.success('Kategori başarıyla eklendi!');
+            }
+            reset();
         } catch (err) {
-            console.error('Kategori oluşturulamadı:', err);
+            const errorMessage = (err as any)?.data?.message || 'Bir hata oluştu';
+            toast.error(errorMessage);
         }
     };
 
     const handleDeleteCategory = async (id: string) => {
-        if (window.confirm('Bu kategoriyi silmek istediğinize emin misiniz? Alt kategorileri varsa onlar da silinecektir.')) {
+        if (window.confirm('Bu kategoriyi silmek istediğinizden emin misiniz?')) {
             try {
                 await deleteCategory(id).unwrap();
+                toast.success('Kategori başarıyla silindi!');
             } catch (err) {
-                 console.error('Kategori silinemedi:', err);
+                const errorMessage = (err as any)?.data?.message || 'Kategori silinirken bir hata oluştu.';
+                toast.error(errorMessage);
             }
         }
     };
-    
-    const renderCategoryOptions = (categories: (Category & { children?: Category[] })[], level = 0): JSX.Element[] => {
-        return categories.flatMap(category => [
-            <option key={category._id} value={category._id}>
-                {'—'.repeat(level)} {category.name}
-            </option>,
-            ...(category.children && category.children.length > 0
-                ? renderCategoryOptions(category.children, level + 1)
-                : [])
-        ]);
+
+    const handleEditCategory = (category: Category) => {
+        setEditingCategory(category);
+    };
+
+    const cancelEdit = () => {
+        setEditingCategory(null);
+        reset();
     };
 
     return (
         <div className="container mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Yeni Kategori Ekleme Kartı */}
             <div className="lg:col-span-1">
-                 <div className="card bg-base-100 shadow-xl">
+                <div className="card bg-base-100 shadow-xl">
                     <div className="card-body">
-                        <h2 className="card-title text-2xl mb-4">Yeni Kategori Ekle</h2>
-                        <form onSubmit={handleCreateCategory}>
-                            <div className="form-control mb-4">
-                                <label className="label" htmlFor="categoryName">
-                                    <span className="label-text font-medium">Kategori Adı</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    id="categoryName"
-                                    value={newCategoryName}
-                                    onChange={(e) => setNewCategoryName(e.target.value)}
-                                    className="input input-bordered w-full"
-                                    placeholder="Örn: Elektronik"
-                                    required
-                                />
+                        <h2 className="card-title text-2xl mb-4">{editingCategory ? 'Kategoriyi Düzenle' : 'Yeni Kategori Ekle'}</h2>
+                        <form onSubmit={handleSubmit(onSubmit)}>
+                            <div className="form-control">
+                                <label className="label"><span className="label-text">Kategori Adı</span></label>
+                                <input type="text" {...register('name', { required: true })} className="input input-bordered w-full" />
                             </div>
-                            <div className="form-control mb-6">
-                                <label className="label" htmlFor="parentCategory">
-                                    <span className="label-text font-medium">Üst Kategori (İsteğe bağlı)</span>
-                                </label>
-                                <select
-                                    id="parentCategory"
-                                    value={selectedParent || ''}
-                                    onChange={(e) => setSelectedParent(e.target.value || null)}
-                                    className="select select-bordered w-full"
-                                >
-                                    <option value="">— Ana Kategori Olarak Ekle —</option>
-                                    {renderCategoryOptions(categoryTree)}
+                            <div className="form-control mt-4">
+                                <label className="label"><span className="label-text">Üst Kategori (İsteğe Bağlı)</span></label>
+                                <select {...register('parent')} className="select select-bordered w-full">
+                                    <option value="">Ana Kategori</option>
+                                    {categoryData?.data?.map(cat => (
+                                        <option key={cat._id} value={cat._id}>{cat.name}</option>
+                                    ))}
                                 </select>
                             </div>
-                            <button
-                                type="submit"
-                                disabled={isLoadingCreate}
-                                className="btn btn-primary w-full"
-                            >
-                                {isLoadingCreate ? (
-                                    <>
-                                        <FaSpinner className="animate-spin mr-2" />
-                                        Ekleniyor...
-                                    </>
-                                ) : (
-                                    <>
-                                        <FaPlus className="mr-2" />
-                                        Ekle
-                                    </>
+                            <div className="card-actions justify-end mt-6">
+                                {editingCategory && (
+                                    <button type="button" onClick={cancelEdit} className="btn btn-ghost">İptal</button>
                                 )}
-                            </button>
+                                <button type="submit" className="btn btn-primary" disabled={isLoadingCreate || isLoadingUpdate}>
+                                    {(isLoadingCreate || isLoadingUpdate) && <FaSpinner className="animate-spin mr-2" />}
+                                    {editingCategory ? 'Güncelle' : 'Ekle'}
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
             </div>
 
-            {/* Kategori Listesi Kartı */}
             <div className="lg:col-span-2">
                 <div className="card bg-base-100 shadow-xl">
                     <div className="card-body">
-                        <h2 className="card-title text-2xl mb-4">Kategori Listesi</h2>
-                        {isLoading && (
-                            <div className="flex items-center justify-center p-8">
-                                <FaSpinner className="animate-spin text-2xl text-primary mr-3" />
-                                <span className="text-lg">Yükleniyor...</span>
-                            </div>
-                        )}
-                        {isError && (
-                            <div className="alert alert-error">
-                                <span>Kategoriler yüklenirken bir hata oluştu.</span>
-                            </div>
-                        )}
-                        {!isLoading && !isError && categoryTree.length === 0 && (
-                            <div className="alert alert-info">
-                                <span>Henüz hiç kategori eklenmemiş.</span>
-                            </div>
-                        )}
+                        <h2 className="card-title text-2xl mb-4">Kategoriler</h2>
+                        {isLoading && <div className="flex justify-center p-8"><FaSpinner className="animate-spin text-4xl" /></div>}
+                        {isError && <div className="alert alert-error">Hata: {(error as any)?.data?.message || 'Kategoriler yüklenemedi.'}</div>}
+                        {!isLoading && !isError && categoryTree.length === 0 && <p>Henüz kategori eklenmemiş.</p>}
                         {!isLoading && !isError && categoryTree.length > 0 && (
-                             <CategoryTree 
-                                 categories={categoryTree} 
-                                 onDelete={handleDeleteCategory} 
-                                 isLoadingDelete={isLoadingDelete} 
-                             />
+                            <CategoryTree
+                                categories={categoryTree}
+                                onDelete={handleDeleteCategory}
+                                onEdit={handleEditCategory}
+                                isLoadingDelete={isLoadingDelete}
+                            />
                         )}
                     </div>
                 </div>

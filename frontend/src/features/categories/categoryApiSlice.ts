@@ -4,7 +4,8 @@ import { Category, ApiResponse } from '../../types';
 export const categoryApiSlice = apiSlice.injectEndpoints({
     endpoints: builder => ({
         getCategories: builder.query<ApiResponse<Category[]>, void>({
-            query: () => '/categories',
+            // '/categories' olan query'yi '/categories?includeChildren=true' olarak değiştirin
+            query: () => '/categories?includeChildren=true', 
             providesTags: (result) =>
                 result?.data
                 ? [...result.data.map(({ _id }) => ({ type: 'Category' as const, id: _id })), { type: 'Category', id: 'LIST' }]
