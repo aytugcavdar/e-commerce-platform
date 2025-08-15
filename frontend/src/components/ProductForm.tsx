@@ -1,117 +1,152 @@
 // frontend/src/components/ProductForm.tsx
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import { useCreateProductMutation, useUpdateProductMutation } from '../features/products/productsApiSlice';
+import { Product } from '../types/Product';
 import { useGetCategoriesQuery } from '../features/categories/categoryApiSlice';
-import { Category, Product } from '../types';
-import { useNotify } from '../hooks/useNotify';
+import { Category } from '../types/Category';
 
 interface IFormInput {
     name: string;
     description: string;
     price: number;
-    stock: number;
     category: string;
+    stock: number;
     images: FileList;
 }
 
-// Yeni: Component'in prop'larını tanımla
 interface ProductFormProps {
-    existingProduct?: Product;
+    onSubmit: (data: any) => void;
+    product?: Product;
+    isLoading: boolean;
 }
 
-const ProductForm: React.FC<ProductFormProps> = ({ existingProduct }) => {
-    const { register, handleSubmit, formState: { errors }, setValue } = useForm<IFormInput>();
-    const navigate = useNavigate();
-
-    const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
-    const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
-    const { data: categoriesData, isLoading: isLoadingCategories } = useGetCategoriesQuery();
-    const notify = useNotify()
-    const isEditMode = !!existingProduct;
+const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, product, isLoading }) => {
+    const { register, handleSubmit, setValue } = useForm<IFormInput>();
+    const { data: categoriesData } = useGetCategoriesQuery({});
+    // Eklendi: Attributes state'leri
+    const [attributes, setAttributes] = useState<{ key: string; value: string }[]>([]);
+    const [attrKey, setAttrKey] = useState('');
+    const [attrValue, setAttrValue] = useState('');
 
     useEffect(() => {
-        if (isEditMode) {
-            setValue('name', existingProduct.name);
-            setValue('description', existingProduct.description);
-            setValue('price', existingProduct.price);
-            setValue('stock', existingProduct.stock);
-            setValue('category', existingProduct.categoryId);
-        }
-    }, [existingProduct, isEditMode, setValue]);
-
-    const onSubmit: SubmitHandler<IFormInput> = async (data) => {
-        // ... (formData oluşturma aynı)
-        try {
-            if (isEditMode) {
-                await updateProduct({ id: existingProduct._id, productData: formData }).unwrap();
-                notify.success('Ürün başarıyla güncellendi!');
-            } else {
-                await createProduct(formData).unwrap();
-                notify.success('Ürün başarıyla oluşturuldu!');
+        if (product) {
+            setValue('name', product.name);
+            setValue('description', product.description);
+            setValue('price', product.price);
+            setValue('category', product.category._id);
+            setValue('stock', product.stock);
+            // Eklendi: Düzenleme modunda mevcut attribute'ları yükle
+            if (product.attributes) {
+                setAttributes(product.attributes);
             }
-            navigate('/admin/products'); 
-        } catch (err) {
-            notify.error(`İşlem sırasında bir hata oluştu: ${isEditMode ? 'güncellenirken' : 'oluşturulurken'}.`);
-            console.error(err);
+        }
+    }, [product, setValue]);
+
+    // Eklendi: Yeni attribute ekleme fonksiyonu
+    const handleAddAttribute = () => {
+        if (attrKey.trim() !== '' && attrValue.trim() !== '') {
+            setAttributes([...attributes, { key: attrKey, value: attrValue }]);
+            setAttrKey('');
+            setAttrValue('');
         }
     };
 
+    // Eklendi: Attribute silme fonksiyonu
+    const handleRemoveAttribute = (index: number) => {
+        setAttributes(attributes.filter((_, i) => i !== index));
+    };
+
+    const handleFormSubmit: SubmitHandler<IFormInput> = (data) => {
+        const formData = new FormData();
+        formData.append('name', data.name);
+        formData.append('description', data.description);
+        formData.append('price', data.price.toString());
+        formData.append('category', data.category);
+        formData.append('stock', data.stock.toString());
+        
+        // Eklendi: Attributes'ları form verisine ekle
+        formData.append('attributes', JSON.stringify(attributes));
+
+        if (data.images) {
+            for (let i = 0; i < data.images.length; i++) {
+                formData.append('images', data.images[i]);
+            }
+        }
+        onSubmit(formData);
+    };
+
     return (
-        <div className="card bg-base-200 shadow-xl p-6">
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                {/* Form alanları aynı kalıyor */}
-                <div className="form-control">
-                    <label className="label"><span className="label-text">Ürün Adı</span></label>
-                    <input type="text" {...register('name', { required: 'Ürün adı zorunludur' })} className="input input-bordered w-full" />
-                    {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
-                </div>
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+            {/* ... diğer form alanları (name, description, price, stock) ... */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Ad</label>
+                <input {...register('name')} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Açıklama</label>
+                <textarea {...register('description')} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Fiyat</label>
+                <input type="number" {...register('price')} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Stok</label>
+                <input type="number" {...register('stock')} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Kategori</label>
+                <select {...register('category')} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                    {categoriesData?.data.map((category: Category) => (
+                        <option key={category._id} value={category._id}>
+                            {category.name}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Resimler</label>
+                <input type="file" {...register('images')} multiple className="mt-1 block w-full" />
+            </div>
 
-                <div className="form-control">
-                    <label className="label"><span className="label-text">Açıklama</span></label>
-                    <textarea {...register('description', { required: 'Açıklama zorunludur' })} className="textarea textarea-bordered w-full" />
-                    {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description.message}</p>}
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="form-control">
-                        <label className="label"><span className="label-text">Fiyat (TL)</span></label>
-                        <input type="number" step="0.01" {...register('price', { required: 'Fiyat zorunludur', valueAsNumber: true })} className="input input-bordered w-full" />
-                         {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price.message}</p>}
+            {/* Eklendi: Attributes Yönetim Arayüzü */}
+            <div className="space-y-2 pt-4">
+                <h3 className="text-lg font-medium">Ürün Özellikleri</h3>
+                {attributes.map((attr, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                        <input type="text" value={attr.key} readOnly className="flex-1 border border-gray-300 rounded-md p-2 bg-gray-100" />
+                        <input type="text" value={attr.value} readOnly className="flex-1 border border-gray-300 rounded-md p-2 bg-gray-100" />
+                        <button type="button" onClick={() => handleRemoveAttribute(index)} className="bg-red-500 text-white px-3 py-1 rounded">
+                            Sil
+                        </button>
                     </div>
-                     <div className="form-control">
-                        <label className="label"><span className="label-text">Stok Adedi</span></label>
-                        <input type="number" {...register('stock', { required: 'Stok zorunludur', valueAsNumber: true })} className="input input-bordered w-full" />
-                        {errors.stock && <p className="text-red-500 text-xs mt-1">{errors.stock.message}</p>}
-                    </div>
-                </div>
-
-                <div className="form-control">
-                    <label className="label"><span className="label-text">Kategori</span></label>
-                    <select {...register('category', { required: 'Kategori seçimi zorunludur' })} className="select select-bordered w-full" disabled={isLoadingCategories}>
-                        <option value="">Kategori Seçin</option>
-                        {categoriesData?.data?.map((cat: Category) => (
-                            <option key={cat._id} value={cat._id}>{cat.name}</option>
-                        ))}
-                    </select>
-                     {errors.category && <p className="text-red-500 text-xs mt-1">{errors.category.message}</p>}
-                </div>
-
-                 <div className="form-control">
-                    <label className="label"><span className="label-text">Ürün Resimleri {isEditMode && '(Değiştirmek için seçin)'}</span></label>
-                    <input type="file" {...register('images')} multiple accept="image/*" className="file-input file-input-bordered w-full" />
-                </div>
-
-                <div className="flex justify-end pt-4">
-                     <button type="submit" className="btn btn-primary" disabled={isCreating || isUpdating}>
-                        {(isCreating || isUpdating) ? <span className="loading loading-spinner"></span> : (isEditMode ? 'Değişiklikleri Kaydet' : 'Yeni Ürünü Kaydet')}
+                ))}
+                <div className="flex items-center space-x-2 pt-2">
+                    <input
+                        type="text"
+                        placeholder="Özellik Adı (örn: Renk)"
+                        value={attrKey}
+                        onChange={(e) => setAttrKey(e.target.value)}
+                        className="flex-1 border border-gray-300 rounded-md p-2"
+                    />
+                    <input
+                        type="text"
+                        placeholder="Özellik Değeri (örn: Kırmızı)"
+                        value={attrValue}
+                        onChange={(e) => setAttrValue(e.target.value)}
+                        className="flex-1 border border-gray-300 rounded-md p-2"
+                    />
+                    <button type="button" onClick={handleAddAttribute} className="bg-green-500 text-white px-3 py-1 rounded">
+                        Ekle
                     </button>
                 </div>
-            </form>
-        </div>
+            </div>
+
+            <button type="submit" disabled={isLoading} className="bg-blue-500 text-white px-4 py-2 rounded disabled:bg-blue-300">
+                {isLoading ? 'Kaydediliyor...' : (product ? 'Ürünü Güncelle' : 'Ürünü Oluştur')}
+            </button>
+        </form>
     );
 };
 

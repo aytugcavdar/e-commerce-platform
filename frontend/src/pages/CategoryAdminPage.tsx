@@ -1,107 +1,169 @@
-import React, { useState } from 'react';
-import { useGetCategoriesQuery, useCreateCategoryMutation, useUpdateCategoryMutation, useDeleteCategoryMutation } from '../features/categories/categoryApiSlice';
-import { useForm, SubmitHandler } from 'react-hook-form';
-import { toast } from 'react-toastify';
-import { Category, ApiResponse } from '../types';
+// frontend/src/pages/CategoryAdminPage.tsx
 
-type FormValues = {
-    name: string;
-    description: string;
-};
+import { useState } from 'react';
+import {
+  useGetCategoriesQuery,
+  useCreateCategoryMutation,
+  useUpdateCategoryMutation,
+  useDeleteCategoryMutation,
+} from '../features/categories/categoryApiSlice';
+import { Category } from '../types/Category';
 
-const CategoryAdminPage: React.FC = () => {
-    const { data: categoriesResponse, isLoading: isLoadingCategories } = useGetCategoriesQuery<ApiResponse<Category[]>>();
-    const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
-    const [updateCategory, { isLoading: isUpdating }] = useUpdateCategoryMutation();
-    const [deleteCategory] = useDeleteCategoryMutation();
+const CategoryAdminPage = () => {
+  const { data: categories, isLoading, isError } = useGetCategoriesQuery({});
+  const [createCategory] = useCreateCategoryMutation();
+  const [updateCategory] = useUpdateCategoryMutation();
+  const [deleteCategory] = useDeleteCategoryMutation();
 
-    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-    const { register, handleSubmit, reset, setValue } = useForm<FormValues>();
+  const [newCategoryName, setNewCategoryName] = useState('');
+  
+  // --- Değişiklik Başlangıcı: State yönetimini refactor ediyoruz ---
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  // --- Değişiklik Sonu ---
 
-    const handleEditClick = (category: Category) => {
-        setEditingCategory(category);
-        setValue('name', category.name);
-        setValue('description', category.description || '');
-    };
+  const [selectedParent, setSelectedParent] = useState('');
 
-    const handleCancelEdit = () => {
-        setEditingCategory(null);
-        reset();
-    };
+  const handleCreateCategory = async () => {
+    if (newCategoryName.trim() !== '') {
+      const parent = selectedParent === '' ? null : selectedParent;
+      await createCategory({ name: newCategoryName, parent });
+      setNewCategoryName('');
+      setSelectedParent('');
+    }
+  };
 
-    const handleDelete = async (id: string) => {
-        if (window.confirm('Bu kategoriyi silmek istediğinizden emin misiniz?')) {
-            try {
-                await deleteCategory(id).unwrap();
-                toast.success('Kategori silindi.');
-            } catch {
-                toast.error('Kategori silinemedi.');
-            }
-        }
-    };
+  // --- Değişiklik Başlangıcı: Güncelleme fonksiyonu yeni state'lere göre düzenlendi ---
+  const handleUpdateCategory = async () => {
+    if (editingId && editingName.trim() !== '') {
+      const parent = selectedParent === '' ? null : selectedParent;
+      await updateCategory({
+        id: editingId, // Artık ID'yi buradan güvenle alıyoruz
+        updatedCategory: { name: editingName, parent },
+      });
+      // Formu temizle
+      setEditingId(null);
+      setEditingName('');
+      setSelectedParent('');
+    }
+  };
+  // --- Değişiklik Sonu ---
 
-    const onSubmit: SubmitHandler<FormValues> = async (data) => {
-        try {
-            if (editingCategory) {
-                await updateCategory({ _id: editingCategory._id, ...data }).unwrap();
-                toast.success('Kategori güncellendi.');
+  const handleDeleteCategory = async (id: string) => {
+    await deleteCategory(id);
+  };
+  
+  // --- Değişiklik Başlangıcı: Formu temizleme/iptal fonksiyonu ---
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditingName('');
+    setSelectedParent('');
+  };
+  // --- Değişiklik Sonu ---
+
+  if (isLoading) return <div>Yükleniyor...</div>;
+  if (isError) return <div>Hata oluştu.</div>;
+
+  const isEditing = editingId !== null;
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Kategorileri Yönet</h1>
+      <div className="mb-4 p-4 border rounded">
+        <h2 className="text-xl mb-2">
+          {isEditing ? 'Kategoriyi Düzenle' : 'Yeni Kategori Ekle'}
+        </h2>
+        <input
+          type="text"
+          className="border p-2 w-full mb-2"
+          placeholder="Kategori Adı"
+          // --- Değişiklik: value ve onChange yeni state'lere bağlandı ---
+          value={isEditing ? editingName : newCategoryName}
+          onChange={(e) => {
+            if (isEditing) {
+              setEditingName(e.target.value);
             } else {
-                await createCategory(data).unwrap();
-                toast.success('Kategori oluşturuldu.');
+              setNewCategoryName(e.target.value);
             }
-            handleCancelEdit();
-        } catch (err) {
-            toast.error(editingCategory ? 'Güncelleme başarısız.' : 'Oluşturma başarısız.');
-        }
-    };
+          }}
+        />
+        <select
+          className="border p-2 w-full mb-2"
+          value={selectedParent}
+          onChange={(e) => setSelectedParent(e.target.value)}
+        >
+          <option value="">Ana Kategori (Üst Kategorisi Yok)</option>
+          {categories?.data.map((category: Category) => (
+             // Düzenleme modunda kategorinin kendisini parent olarak seçmesini engelle
+            (editingId !== category._id) && (
+              <option key={category._id} value={category._id}>
+                {category.name}
+              </option>
+            )
+          ))}
+        </select>
+        {isEditing ? (
+          <div>
+            <button
+              onClick={handleUpdateCategory}
+              className="bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Güncelle
+            </button>
+            <button
+              onClick={cancelEditing} // İptal butonu eklendi
+              className="bg-gray-500 text-white px-4 py-2 rounded ml-2"
+            >
+              İptal
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleCreateCategory}
+            className="bg-green-500 text-white px-4 py-2 rounded"
+          >
+            Ekle
+          </button>
+        )}
+      </div>
 
-    return (
-        <div className="container mx-auto p-8">
-            <h1 className="text-3xl font-bold mb-6">Kategori Yönetimi</h1>
-
-            {/* Form */}
-            <div className="card bg-base-200 shadow-xl p-6 mb-8">
-                <h2 className="text-xl font-semibold mb-4">{editingCategory ? 'Kategori Düzenle' : 'Yeni Kategori Ekle'}</h2>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                    <input {...register('name', { required: true })} placeholder="Kategori Adı" className="input input-bordered w-full" />
-                    <textarea {...register('description')} placeholder="Açıklama (opsiyonel)" className="textarea textarea-bordered w-full" />
-                    <div className="flex justify-end space-x-2">
-                        {editingCategory && <button type="button" onClick={handleCancelEdit} className="btn btn-ghost">İptal</button>}
-                        <button type="submit" className="btn btn-primary" disabled={isCreating || isUpdating}>
-                            {editingCategory ? 'Güncelle' : 'Ekle'}
-                        </button>
-                    </div>
-                </form>
+      <h2 className="text-xl mb-2">Mevcut Kategoriler</h2>
+      <ul>
+        {categories?.data.map((category: Category) => (
+          <li
+            key={category._id}
+            className="flex justify-between items-center p-2 border-b"
+          >
+            <div>
+              <span>{category.name}</span>
+              <span className="text-sm text-gray-500 ml-2">
+                {category.parent ? `(${categories.data.find((c: Category) => c._id === category.parent)?.name})` : ''}
+              </span>
             </div>
-            
-            {/* Kategori Listesi */}
-            <div className="overflow-x-auto">
-                {isLoadingCategories ? <p>Yükleniyor...</p> : (
-                    <table className="table w-full">
-                        <thead>
-                            <tr>
-                                <th>Ad</th>
-                                <th>Açıklama</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {categoriesResponse?.data?.map((cat) => (
-                                <tr key={cat._id}>
-                                    <td>{cat.name}</td>
-                                    <td>{cat.description}</td>
-                                    <td className="space-x-2">
-                                        <button onClick={() => handleEditClick(cat)} className="btn btn-sm btn-outline">Düzenle</button>
-                                        <button onClick={() => handleDelete(cat._id)} className="btn btn-sm btn-outline btn-error">Sil</button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+            <div>
+              <button
+                // --- Değişiklik: Düzenleme state'lerini ayarla ---
+                onClick={() => {
+                  setEditingId(category._id);
+                  setEditingName(category.name);
+                  setSelectedParent(category.parent || '');
+                }}
+                className="bg-yellow-500 text-white px-2 py-1 rounded"
+              >
+                Düzenle
+              </button>
+              <button
+                onClick={() => handleDeleteCategory(category._id)}
+                className="bg-red-500 text-white px-2 py-1 rounded ml-2"
+              >
+                Sil
+              </button>
             </div>
-        </div>
-    );
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 };
 
 export default CategoryAdminPage;

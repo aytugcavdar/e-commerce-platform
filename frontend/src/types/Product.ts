@@ -7,6 +7,10 @@ export interface Product {
     public_id: string;
     url: string;
   }[];
+  attributes: {
+        key: string;
+        value: string;
+    }[];
   category: {
     _id: string;
     name: string;
