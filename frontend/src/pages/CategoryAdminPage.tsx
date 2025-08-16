@@ -4,7 +4,7 @@ import { FaTrash, FaPlus, FaSpinner, FaAngleDown, FaAngleRight, FaEdit } from 'r
 import { toast } from 'react-toastify';
 import {
     useGetCategoriesQuery,
-    useCreateCategoryMutation,
+    useAddCategoryMutation,
     useDeleteCategoryMutation,
     useUpdateCategoryMutation,
 } from '../features/categories/categoryApiSlice'; // <-- HATA BURADAYDI, DÜZELTİLDİ
@@ -91,7 +91,7 @@ const CategoryTree: React.FC<{
 
 const CategoryAdminPage = () => {
     const { data: categoryData, isLoading, isError, error } = useGetCategoriesQuery();
-    const [createCategory, { isLoading: isLoadingCreate }] = useCreateCategoryMutation();
+    const [addCategory, { isLoading: isLoadingCreate }] = useAddCategoryMutation();
     const [deleteCategory, { isLoading: isLoadingDelete }] = useDeleteCategoryMutation();
     const [updateCategory, { isLoading: isLoadingUpdate }] = useUpdateCategoryMutation();
 
@@ -122,7 +122,7 @@ const CategoryAdminPage = () => {
                 toast.success('Kategori başarıyla güncellendi!');
                 setEditingCategory(null);
             } else {
-                await createCategory(payload).unwrap();
+                await addCategory(payload).unwrap();
                 toast.success('Kategori başarıyla eklendi!');
             }
             reset();

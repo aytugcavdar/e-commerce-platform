@@ -66,6 +66,25 @@ exports.getCategory = asyncHandler(async (req, res, next) => {
     });
 });
 
+// @desc      Get sub-categories for a parent category
+// @route     GET /api/v1/categories/:parentId/subcategories
+// @access    Public
+exports.getSubCategories = asyncHandler(async (req, res, next) => {
+  const subCategories = await Category.find({ parent: req.params.parentId });
+
+  if (!subCategories) {
+    return next(
+      new ErrorResponse(`No sub-categories found for parent ${req.params.parentId}`, 404)
+    );
+  }
+
+  res.status(200).json({
+    success: true,
+    count: subCategories.length,
+    data: subCategories,
+  });
+});
+
 // @desc    Yeni bir kategori oluştur
 // @route   POST /api/categories
 // @access  Private/Admin
