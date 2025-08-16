@@ -100,6 +100,13 @@ exports.createProduct = asyncHandler(async (req, res, next) => {
             url: file.path
         }));
     }
+    if (req.body.attributes && typeof req.body.attributes === 'string') {
+        try {
+            req.body.attributes = JSON.parse(req.body.attributes);
+        } catch (e) {
+            return next(new ErrorResponse('Invalid attributes format', 400));
+        }
+    }
 
     const product = await Product.create(req.body);
 
