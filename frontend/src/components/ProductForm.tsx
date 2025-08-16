@@ -21,10 +21,10 @@ interface ProductFormProps {
     isLoading: boolean;
 }
 
-const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, product, isLoading }) => {
+const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, product, isLoading: isFormLoading }) => {
     const { register, handleSubmit, setValue } = useForm<IFormInput>();
-    const { data: categoriesData } = useGetCategoriesQuery({});
-    // Eklendi: Attributes state'leri
+    // Değişiklik: 'data'yı 'categories' olarak yeniden adlandırdık ve yüklenme durumunu aldık.
+    const { data: categories, isLoading: areCategoriesLoading } = useGetCategoriesQuery();
     const [attributes, setAttributes] = useState<{ key: string; value: string }[]>([]);
     const [attrKey, setAttrKey] = useState('');
     const [attrValue, setAttrValue] = useState('');
@@ -34,16 +34,15 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, product, isLoading 
             setValue('name', product.name);
             setValue('description', product.description);
             setValue('price', product.price);
-            setValue('category', product.category._id);
+            // Kategori ID'sinin string olduğundan emin olalım
+            setValue('category', product.category?._id || '');
             setValue('stock', product.stock);
-            // Eklendi: Düzenleme modunda mevcut attribute'ları yükle
             if (product.attributes) {
                 setAttributes(product.attributes);
             }
         }
     }, [product, setValue]);
 
-    // Eklendi: Yeni attribute ekleme fonksiyonu
     const handleAddAttribute = () => {
         if (attrKey.trim() !== '' && attrValue.trim() !== '') {
             setAttributes([...attributes, { key: attrKey, value: attrValue }]);
@@ -52,7 +51,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, product, isLoading 
         }
     };
 
-    // Eklendi: Attribute silme fonksiyonu
     const handleRemoveAttribute = (index: number) => {
         setAttributes(attributes.filter((_, i) => i !== index));
     };
@@ -62,13 +60,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, product, isLoading 
         formData.append('name', data.name);
         formData.append('description', data.description);
         formData.append('price', data.price.toString());
-        formData.append('category', data.category);
+        formData.append('categoryId', data.category); // Backend'in beklediği alan adı 'categoryId' olabilir
         formData.append('stock', data.stock.toString());
-        
-        // Eklendi: Attributes'ları form verisine ekle
         formData.append('attributes', JSON.stringify(attributes));
 
-        if (data.images) {
+        if (data.images && data.images.length > 0) {
             for (let i = 0; i < data.images.length; i++) {
                 formData.append('images', data.images[i]);
             }
@@ -78,7 +74,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, product, isLoading 
 
     return (
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-            {/* ... diğer form alanları (name, description, price, stock) ... */}
             <div>
                 <label className="block text-sm font-medium text-gray-700">Ad</label>
                 <input {...register('name')} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
@@ -89,7 +84,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, product, isLoading 
             </div>
             <div>
                 <label className="block text-sm font-medium text-gray-700">Fiyat</label>
-                <input type="number" {...register('price')} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                <input type="number" step="0.01" {...register('price')} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
             </div>
             <div>
                 <label className="block text-sm font-medium text-gray-700">Stok</label>
@@ -98,11 +93,16 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, product, isLoading 
             <div>
                 <label className="block text-sm font-medium text-gray-700">Kategori</label>
                 <select {...register('category')} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
-                    {categoriesData?.data.map((category: Category) => (
-                        <option key={category._id} value={category._id}>
-                            {category.name}
-                        </option>
-                    ))}
+                    {areCategoriesLoading ? (
+                        <option>Yükleniyor...</option>
+                    ) : (
+                        // Değişiklik: Artık doğrudan 'categories' dizisini map'liyoruz.
+                        categories?.map((category: Category) => (
+                            <option key={category._id} value={category._id}>
+                                {category.name}
+                            </option>
+                        ))
+                    )}
                 </select>
             </div>
             <div>
@@ -110,7 +110,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, product, isLoading 
                 <input type="file" {...register('images')} multiple className="mt-1 block w-full" />
             </div>
 
-            {/* Eklendi: Attributes Yönetim Arayüzü */}
             <div className="space-y-2 pt-4">
                 <h3 className="text-lg font-medium">Ürün Özellikleri</h3>
                 {attributes.map((attr, index) => (
@@ -143,8 +142,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, product, isLoading 
                 </div>
             </div>
 
-            <button type="submit" disabled={isLoading} className="bg-blue-500 text-white px-4 py-2 rounded disabled:bg-blue-300">
-                {isLoading ? 'Kaydediliyor...' : (product ? 'Ürünü Güncelle' : 'Ürünü Oluştur')}
+            <button type="submit" disabled={isFormLoading} className="bg-blue-500 text-white px-4 py-2 rounded disabled:bg-blue-300">
+                {isFormLoading ? 'Kaydediliyor...' : (product ? 'Ürünü Güncelle' : 'Ürünü Oluştur')}
             </button>
         </form>
     );
