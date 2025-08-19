@@ -14,13 +14,11 @@ export const productsApiSlice = apiSlice.injectEndpoints({
             query: (id) => `/products/${id}`,
             providesTags: (result, error, id) => [{ type: 'Product', id }],
         }),
-        // YENİ EKlenen MUTATION'LAR
-        createProduct: builder.mutation<ApiResponse<Product>, FormData>({
+        createProduct: builder.mutation<ApiResponse<Product>, Partial<Product>>({
             query: (productData) => ({
                 url: '/products',
                 method: 'POST',
                 body: productData,
-                // FormData olduğu için header otomatik ayarlanır
             }),
             invalidatesTags: [{ type: 'Product', id: 'LIST' }]
         }),
@@ -39,14 +37,27 @@ export const productsApiSlice = apiSlice.injectEndpoints({
             }),
             invalidatesTags: (result, error, id) => [{ type: 'Product', id }, { type: 'Product', id: 'LIST' }]
         }),
+        uploadProductImages: builder.mutation<ApiResponse<Product>, { id: string; formData: FormData }>({
+            query: ({ id, formData }) => ({
+                url: `/products/${id}`,
+                method: 'PUT',
+                body: formData,
+            }),
+            invalidatesTags: (result, error, arg) => [{ type: 'Product', id: arg.id }]
+        }),
+        getProductWithCategory: builder.query<Product, string>({
+      query: (id) => `/products/${id}/with-category`,
+      providesTags: (result, error, id) => [{ type: 'Product', id }],
+    }),
     })
 });
 
 export const { 
     useGetProductsQuery, 
     useGetProductQuery,
-    // YENİ hook'ları export et
     useCreateProductMutation,
     useUpdateProductMutation,
     useDeleteProductMutation,
+    useUploadProductImagesMutation,
+    useGetProductWithCategoryQuery
 } = productsApiSlice;

@@ -7,7 +7,8 @@ const {
     updateCategory,
     deleteCategory,
     getCategoryStats,
-    getSubCategories
+    getSubCategories,
+    getCategoryWithAncestors,
 } = require('../controllers/categories');
 
 // Middleware'leri import et
@@ -21,6 +22,7 @@ router.route('/stats').get(getCategoryStats);
 router.route('/:id').get(getCategory);
 router.route('/:id/children').get(getCategoryChildren);
 router.route('/:parentId/subcategories').get(getSubCategories);
+router.route('/:id/with-ancestors').get(getCategoryWithAncestors);
 // Private/Admin Rotalar (Sadece 'admin' rolündeki kullanıcılar erişebilir)
 router.route('/').post(protect, authorize('admin'), createCategory);
 

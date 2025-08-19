@@ -52,39 +52,33 @@ exports.getProduct = asyncHandler(async (req, res, next) => {
     res.status(200).json({ success: true, data: product });
 });
 
-// ALTERNATIF: Eğer category bilgisine ihtiyacınız varsa bu şekilde yapabilirsiniz
+// @desc      Get single product with category and its ancestors
+// @route     GET /api/v1/products/:id/with-category
+// @access    Public
 exports.getProductWithCategory = asyncHandler(async (req, res, next) => {
-    const product = await Product.findById(req.params.id);
+  const product = await Product.findById(req.params.id);
 
-    if (!product) {
-        return next(new ErrorResponse(`ID'si ${req.params.id} olan ürün bulunamadı`, 404));
+  if (!product) {
+    return next(
+      new ErrorResponse(`Product not found with id of ${req.params.id}`, 404)
+    );
+  }
+
+  let category = null;
+  if (product.categoryId) {
+    try {
+      // Kategori servisine isteği güncelliyoruz
+      const categoryRes = await axios.get(
+        `${process.env.CATEGORY_SERVICE_URL}/${product.categoryId}/with-ancestors`
+      );
+      category = categoryRes.data.data;
+    } catch (err) {
+      console.error('Error fetching category:', err.message);
+      // Servis erişilemezse bile devam et, sadece kategori null olur
     }
+  }
 
-    // Eğer categoryInfo cache'i boş ise, category service'ten çek
-    let productWithCategory = product.toObject();
-    
-    if (!product.categoryInfo || !product.categoryInfo.name) {
-        try {
-            // Category service'ten kategori bilgilerini çek
-            const axios = require('axios');
-            const categoryResponse = await axios.get(`http://localhost:5004/${product.categoryId}`, {
-                timeout: 3000
-            });
-            
-            if (categoryResponse.data && categoryResponse.data.success) {
-                productWithCategory.category = categoryResponse.data.data;
-            }
-        } catch (error) {
-            console.log('Kategori bilgisi alınamadı, cache kullanılıyor:', error.message);
-            // Hata durumunda categoryInfo cache'ini kullan
-            productWithCategory.category = product.categoryInfo;
-        }
-    } else {
-        // Cache'deki kategori bilgisini kullan
-        productWithCategory.category = product.categoryInfo;
-    }
-
-    res.status(200).json({ success: true, data: productWithCategory });
+  res.status(200).json({ success: true, data: { ...product._doc, category } });
 });
 
 // @desc    Yeni bir ürün oluştur

@@ -250,3 +250,17 @@ exports.getCategoryStats = asyncHandler(async (req, res, next) => {
         data: result
     });
 });
+// @desc      Get single category with its ancestors
+// @route     GET /api/v1/categories/:id/with-ancestors
+// @access    Public
+exports.getCategoryWithAncestors = asyncHandler(async (req, res, next) => {
+  const category = await Category.findById(req.params.id).populate('ancestors');
+
+  if (!category) {
+    return next(
+      new ErrorResponse(`Category not found with id of ${req.params.id}`, 404)
+    );
+  }
+
+  res.status(200).json({ success: true, data: category });
+});
