@@ -42,6 +42,15 @@ CategorySchema.virtual('children', {
     justOne: false
 });
 
+//  Ancestors için virtual populate ekleyin
+CategorySchema.virtual('ancestors', {
+    ref: 'Category',
+    localField: 'parent',
+    foreignField: '_id',
+    justOne: false
+});
+
+
 // Index'ler
 
 CategorySchema.index({ name: 1, parent: 1 }, { unique: true });

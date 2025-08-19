@@ -13,6 +13,8 @@ const ProductDetailPage = () => {
     error,
   } = useGetProductWithCategoryQuery(id || '');
 
+  console.log('Product Data:', product.data.images[0].url);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -74,24 +76,24 @@ const ProductDetailPage = () => {
       <div className="card lg:card-side bg-base-100 shadow-xl">
         <figure className="lg:w-1/2">
           <img
-            src={product.images?.[0] || 'https://via.placeholder.com/800x600'}
-            alt={product.name}
+            src={product.data.images[0].url|| 'https://via.placeholder.com/800x600'}
+            alt={product.data.name}
             className="w-full h-full object-cover"
           />
         </figure>
         <div className="card-body lg:w-1/2">
-          <h1 className="card-title text-3xl md:text-4xl">{product.name}</h1>
-          <p className="text-2xl font-bold text-primary my-2">{product.price} TL</p>
-          <p className="mt-4 text-base-content/80">{product.description}</p>
+          <h1 className="card-title text-3xl md:text-4xl">{product.data.name}</h1>
+          <p className="text-2xl font-bold text-primary my-2">{product.data.price} TL</p>
+          <p className="mt-4 text-base-content/80">{product.data.description}</p>
 
           {/* Stok Durumu */}
           <div className="my-4">
-            {product.stock > 0 ? (
+            {product.data.stock > 0 ? (
               <div className="badge badge-success gap-2">Stokta</div>
             ) : (
               <div className="badge badge-error gap-2">Tükendi</div>
             )}
-            <span className="ml-2 text-sm">({product.stock} adet)</span>
+            <span className="ml-2 text-sm">({product.data.stock} adet)</span>
           </div>
           
           {/* Ürün Özellikleri (Attributes) */}
@@ -114,7 +116,7 @@ const ProductDetailPage = () => {
           )}
 
           <div className="card-actions justify-end mt-6">
-            <button className="btn btn-primary w-full md:w-auto" disabled={product.stock === 0}>
+            <button className="btn btn-primary w-full md:w-auto" disabled={product.data.stock === 0}>
               <FaShoppingCart />
               Sepete Ekle
             </button>
