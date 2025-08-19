@@ -4,8 +4,8 @@ import { FaShoppingCart } from 'react-icons/fa';
 
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  console.log('Product ID:', id);
 
-  // Güncellenmiş hook'u kullanıyoruz
   const {
     data: product,
     isLoading,

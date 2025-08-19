@@ -53,12 +53,15 @@ exports.getProduct = asyncHandler(async (req, res, next) => {
 });
 
 // @desc      Get single product with category and its ancestors
-// @route     GET /api/v1/products/:id/with-category
+// @route     GET /api/products/:id/with-category
 // @access    Public
 exports.getProductWithCategory = asyncHandler(async (req, res, next) => {
+  console.log(`🔍 Kategori ile ürün aranıyor: ${req.params.id}`);
+  
   const product = await Product.findById(req.params.id);
 
   if (!product) {
+    console.log(`❌ Ürün bulunamadı: ${req.params.id}`);
     return next(
       new ErrorResponse(`Product not found with id of ${req.params.id}`, 404)
     );
@@ -67,18 +70,24 @@ exports.getProductWithCategory = asyncHandler(async (req, res, next) => {
   let category = null;
   if (product.categoryId) {
     try {
-      // Kategori servisine isteği güncelliyoruz
+      // Kategori servisine istek gönder
+      const axios = require('axios'); // axios import'unu buraya ekleyelim
       const categoryRes = await axios.get(
-        `${process.env.CATEGORY_SERVICE_URL}/${product.categoryId}/with-ancestors`
+        `http://localhost:5004/${product.categoryId}/with-ancestors`
       );
       category = categoryRes.data.data;
+      console.log(`✅ Kategori bilgisi alındı: ${category?.name}`);
     } catch (err) {
-      console.error('Error fetching category:', err.message);
+      console.error('❌ Kategori servisi ile iletişim hatası:', err.message);
       // Servis erişilemezse bile devam et, sadece kategori null olur
     }
   }
 
-  res.status(200).json({ success: true, data: { ...product._doc, category } });
+  console.log(`✅ Kategori ile ürün bulundu: ${product.name}`);
+  res.status(200).json({ 
+    success: true, 
+    data: { ...product._doc, category } 
+  });
 });
 
 // @desc    Yeni bir ürün oluştur

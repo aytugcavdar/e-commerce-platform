@@ -45,10 +45,11 @@ export const productsApiSlice = apiSlice.injectEndpoints({
             }),
             invalidatesTags: (result, error, arg) => [{ type: 'Product', id: arg.id }]
         }),
-        getProductWithCategory: builder.query<Product, string>({
-      query: (id) => `/products/${id}/with-category`,
-      providesTags: (result, error, id) => [{ type: 'Product', id }],
-    }),
+        // URL düzeltmesi: çift slash sorunu giderildi
+        getProductWithCategory: builder.query<ApiResponse<Product>, string>({
+            query: (id) => `/products/${id}/with-category`,
+            providesTags: (result, error, id) => [{ type: 'Product', id }],
+        }),
     })
 });
 
