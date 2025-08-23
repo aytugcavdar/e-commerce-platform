@@ -22,28 +22,41 @@ async function startOrderCreatedListener() {
         await channel.assertQueue(queueName, { durable: true });
         console.log(`[Product-Service] "${queueName}" kuyruğu dinleniyor.`.green);
 
-        channel.consume(queueName, async (msg) => {
-            if (msg !== null) {
-                const { order } = JSON.parse(msg.content.toString());
-                console.log(`[Product-Service] Sipariş #${order._id} için stok güncelleme işlemi alındı.`.cyan);
+        channel.consume('order.created', async (msg) => {
+          console.log('[Product-Service] "order.created" mesajı alındı.');
+          console.log('Mesaj içeriği:', msg.content.toString());
+          console.log('Mesaj objesi:', msg);
+        if (msg !== null) {
+          try {
+            const order = JSON.parse(msg.content.toString());
+            console.log('[Product-Service] Yeni sipariş alındı:', JSON.stringify(order, null, 2));
 
-                // Gelen siparişteki ürünler için stok düşürme operasyonlarını hazırla
-                const bulkOps = order.orderItems.map(item => ({
-                    updateOne: {
-                        filter: { _id: item.productId },
-                        update: { $inc: { stock: -item.quantity } }
-                    }
-                }));
+            for (const product of order.products) {
+              console.log(`[Product-Service] Stok güncelleniyor: Ürün ID = ${product._id}, Adet = ${product.quantity}`);
+              
+              const updatedProduct = await Product.findByIdAndUpdate(
+                product._id,
+                { $inc: { countInStock: -product.quantity } },
+                { new: true } // Bu seçenek, güncellenmiş dokümanı döndürür
+              );
 
-                // Eğer güncellenecek ürün varsa, veritabanına tek seferde yaz
-                if (bulkOps.length > 0) {
-                    await Product.bulkWrite(bulkOps);
-                    console.log(`[Product-Service] Stoklar güncellendi.`.cyan.bold);
-                }
-
-                channel.ack(msg); // Mesajın başarıyla işlendiğini onayla
+              if (updatedProduct) {
+                console.log(`[Product-Service] Stok başarıyla güncellendi. Yeni stok: ${updatedProduct.countInStock}`, updatedProduct);
+              } else {
+                console.error(`[Product-Service] HATA: ${product._id} ID'li ürün veritabanında bulunamadı!`);
+              }
             }
-        });
+            
+            console.log('[Product-Service] Tüm stoklar güncellendi.');
+            channel.ack(msg);
+          } catch (error) {
+            console.error('[Product-Service] Stok güncellenirken bir hata oluştu:', error);
+            // Hata durumunda mesajı reddetmek yerine loglayıp devam edebilir veya
+            // tekrar işlenmesi için nack(msg, false, true) kullanabilirsiniz.
+            channel.ack(msg); 
+          }
+        }
+      });
     } catch (error) {
         console.error("[Product-Service] RabbitMQ bağlantı hatası:", error);
     }

@@ -9,8 +9,11 @@ import Card from '../components/common/Card';
 const HomePage: React.FC = () => {
   const { data: productsData, isLoading, isSuccess, isError, error } = useGetProductsQuery<ApiResponse<Product[]>>(undefined);
   const [addToCart, { isLoading: isAddingToCart }] = useAddToCartMutation();
+  
   const navigate = useNavigate();
   const notify = useNotify();
+
+  console.log('Products data:', productsData?.data);
 
   const handleClick = (productId: string) => {
     navigate(`/products/${productId}`);
