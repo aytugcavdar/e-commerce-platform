@@ -5,7 +5,7 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const amqp = require('amqplib'); // RabbitMQ
 const sendEmail = require('./utils/sendEmail');
-
+const colors = require('colors');
 dotenv.config({ path: './.env' });
 
 const app = express();

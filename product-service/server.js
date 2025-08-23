@@ -15,17 +15,23 @@ dotenv.config({ path: './.env' });
 
 async function startOrderCreatedListener() {
     try {
-        const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://guest:guest@localhost');
-        const channel = await connection.createChannel();
-        const queueName = 'order.created';
+    const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://guest:guest@localhost');
+    const channel = await connection.createChannel();
 
-        await channel.assertQueue(queueName, { durable: true });
-        console.log(`[Product-Service] "${queueName}" kuyruğu dinleniyor.`.green);
+    const exchangeName = 'order_exchange';
+    const queueName = 'product_service_order_created'; 
+    const routingKey = 'order.created';
 
-        channel.consume('order.created', async (msg) => {
-          console.log('[Product-Service] "order.created" mesajı alındı.');
-          console.log('Mesaj içeriği:', msg.content.toString());
-          console.log('Mesaj objesi:', msg);
+    await channel.assertExchange(exchangeName, 'direct', { durable: true });
+    await channel.assertQueue(queueName, { durable: true });
+    await channel.bindQueue(queueName, exchangeName, routingKey);
+
+    console.log(`[Product-Service] "${queueName}" kuyruğu dinleniyor.`.green);
+
+    channel.consume(queueName, async (msg) => {
+      console.log('[Product-Service] "order.created" mesajı alındı.');
+      console.log('Mesaj içeriği:', msg.content.toString());
+      console.log('Mesaj objesi:', msg);
         if (msg !== null) {
           try {
             const order = JSON.parse(msg.content.toString());
@@ -34,14 +40,17 @@ async function startOrderCreatedListener() {
             for (const product of order.products) {
               console.log(`[Product-Service] Stok güncelleniyor: Ürün ID = ${product._id}, Adet = ${product.quantity}`);
               
-              const updatedProduct = await Product.findByIdAndUpdate(
+                const updatedProduct = await Product.findByIdAndUpdate(
                 product._id,
-                { $inc: { countInStock: -product.quantity } },
+                console.log(`[Product-Service] "${product._id}" ID'li ürün güncelleniyor.`),
+                console.log(`[Product-Service] Stok azaltılıyor: ${product.quantity}`),
+                console.log("product", product),
+                { $inc: { stock: -product.quantity } },
                 { new: true } // Bu seçenek, güncellenmiş dokümanı döndürür
               );
 
               if (updatedProduct) {
-                console.log(`[Product-Service] Stok başarıyla güncellendi. Yeni stok: ${updatedProduct.countInStock}`, updatedProduct);
+                console.log(`[Product-Service] Stok başarıyla güncellendi. Yeni stok: ${updatedProduct.stock}`, updatedProduct);
               } else {
                 console.error(`[Product-Service] HATA: ${product._id} ID'li ürün veritabanında bulunamadı!`);
               }
