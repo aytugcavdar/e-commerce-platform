@@ -38,54 +38,52 @@ const publishToQueue = async (queueName, data) => {
  * @access  Private
  */
 exports.createOrder = asyncHandler(async (req, res, next) => {
-    const { orderItems, shippingAddress, paymentMethod, itemsPrice, taxPrice, shippingPrice, totalPrice } = req.body;
+    const { shippingAddress, paymentMethod } = req.body;
+    const userId = req.user.id;
+    const userToken = req.cookies.token;
 
-    if (orderItems && orderItems.length === 0) {
-        return next(new ErrorResponse('No order items', 400));
+    // 1. ADIM: Cart Service'ten kullanıcının sepetini al (Bu işlem senkron kalmalı)
+    let cart;
+    try {
+         const { data } = await axios.get('http://localhost:5005/', {
+            headers: { 'Cookie': `token=${userToken}` }
+        });
+        cart = data.data;
+    } catch (err) {
+        return next(new ErrorResponse('Sepet bilgileri alınamadı. Lütfen tekrar deneyin.', 500));
     }
 
+    if (!cart || cart.items.length === 0) {
+        return next(new ErrorResponse('Sipariş oluşturmak için sepetinizde ürün olmalıdır.', 400));
+    }
+
+    // 2. ADIM: Siparişi veritabanında oluştur
     const order = new Order({
-        orderItems,
-        userId: req.user.id,
-        shippingAddress,
-        paymentMethod,
-        itemsPrice,
-        taxPrice,
-        shippingPrice,
-        totalPrice
+        userId: userId,
+        orderItems: cart.items,
+        shippingAddress: shippingAddress,
+        paymentMethod: paymentMethod,
+        itemsPrice: cart.totalPrice,
+        taxPrice: 0,
+        shippingPrice: 0,
+        totalPrice: cart.totalPrice,
     });
 
     const createdOrder = await order.save();
 
-    // RabbitMQ'ya sipariş oluşturuldu mesajı gönder
-    try {
-        const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://guest:guest@localhost');
-        const channel = await connection.createChannel();
-        
-        // YENİ: Exchange'i tanımla
-        const exchangeName = 'order_exchange';
-        await channel.assertExchange(exchangeName, 'fanout', { durable: false });
+    // 3. ADIM: "order.created" OLAYINI MESAJ KUYRUĞUNA GÖNDER
+    // Bu mesajı diğer servisler (product, notification, cart) dinleyecek.
+    const eventData = {
+        order: createdOrder,
+        user: req.user, // E-posta gibi bilgiler için
+        token: userToken // Sepeti temizlemek için
+    };
+    await publishToQueue('order.created', eventData);
 
-        const message = {
-            order: createdOrder._doc,
-            user: { id: req.user.id, name: req.user.name, email: req.user.email },
-        };
-
-        // GÜNCELLEME: Mesajı kuyruğa değil, exchange'e publish et
-        channel.publish(exchangeName, '', Buffer.from(JSON.stringify(message))); // routingKey fanout için boş bırakılır
-
-        console.log(`Mesaj "${exchangeName}" exchange'ine gönderildi.`.blue.bold);
-
-        setTimeout(() => {
-            connection.close();
-        }, 500);
-    } catch (error) {
-        console.error("RabbitMQ Mesaj gönderme hatası:", error);
-    }
-
+    // Kullanıcıya anında yanıt dön. Stok düşürme, bildirim gönderme gibi işlemler
+    // artık arka planda asenkron olarak gerçekleşecek.
     res.status(201).json({ success: true, data: createdOrder });
 });
-
 
 /**
  * @desc    Giriş yapmış kullanıcının tüm siparişlerini getirir.
