@@ -22,6 +22,7 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
+
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
@@ -39,14 +40,40 @@ const server = app.listen(
   )
 );
 
-// RabbitMQ Dinleyicisini Başlat
-async function startOrderCreatedListener() {
+// --- RabbitMQ Dinleyicilerini Başlat ---
+async function startRabbitMQListeners() {
   try {
     const connection = await amqp.connect(
       process.env.AMQP_URL || "amqp://guest:guest@localhost"
     );
     const channel = await connection.createChannel();
-    const queueName = "order.created";
+
+    // --- 1. SİPARİŞ SONRASI SEPET TEMİZLEME (FANOUT EXCHANGE İLE) ---
+    const orderExchangeName = 'order_exchange';
+    await channel.assertExchange(orderExchangeName, 'fanout', { durable: false });
+
+    // Service'e özel geçici bir kuyruk oluştur ve exchange'e bağla
+    const q_order = await channel.assertQueue('', { exclusive: true });
+    console.log(`[Cart-Service] Siparişler için geçici kuyruk oluşturuldu: ${q_order.queue}`.green);
+
+    channel.bindQueue(q_order.queue, orderExchangeName, '');
+    console.log(`[Cart-Service] Kuyruk "${orderExchangeName}" exchange'ine bağlandı.`.green);
+
+    channel.consume(q_order.queue, async (msg) => {
+        if (msg.content) {
+            const { user } = JSON.parse(msg.content.toString());
+            console.log(
+              `[Cart-Service] Sipariş sonrası ${user.id} ID'li kullanıcının sepetini temizleme işlemi alındı.`
+                .cyan
+            );
+
+            await Cart.findOneAndDelete({ userId: user.id });
+            console.log(`[Cart-Service] Sepet temizlendi.`.cyan.bold);
+        }
+    }, { noAck: true }); // Mesajı otomatik onayla
+
+
+    // --- 2. ÜRÜN CACHE GÜNCELLEME (DOĞRUDAN KUYRUK DİNLEME İLE) ---
     const productCreatedQueue = "product.created";
     const productUpdatedQueue = "product.updated";
     const productDeletedQueue = "product.deleted";
@@ -54,9 +81,6 @@ async function startOrderCreatedListener() {
     await channel.assertQueue(productCreatedQueue, { durable: true });
     await channel.assertQueue(productUpdatedQueue, { durable: true });
     await channel.assertQueue(productDeletedQueue, { durable: true });
-
-    await channel.assertQueue(queueName, { durable: true });
-    console.log(`[Cart-Service] "${queueName}" kuyruğu dinleniyor.`.green);
     console.log("[Cart-Service] Ürün kuyrukları dinleniyor...".green);
 
     const upsertProduct = async (msg) => {
@@ -82,7 +106,6 @@ async function startOrderCreatedListener() {
       }
     };
 
-    // Ürün silindiğinde
     const deleteProduct = async (msg) => {
       if (msg) {
         const { productId } = JSON.parse(msg.content.toString());
@@ -98,27 +121,13 @@ async function startOrderCreatedListener() {
     channel.consume(productUpdatedQueue, upsertProduct);
     channel.consume(productDeletedQueue, deleteProduct);
 
-    channel.consume(queueName, async (msg) => {
-      if (msg !== null) {
-        const { user } = JSON.parse(msg.content.toString());
-        console.log(
-          `[Cart-Service] Sipariş sonrası ${user.id} ID'li kullanıcının sepetini temizleme işlemi alındı.`
-            .cyan
-        );
-
-        await Cart.findOneAndDelete({ userId: user.id });
-        console.log(`[Cart-Service] Sepet temizlendi.`.cyan.bold);
-
-        channel.ack(msg);
-      }
-    });
   } catch (error) {
-    console.error("[Cart-Service] RabbitMQ bağlantı hatası:", error);
+    console.error("[Cart-Service] RabbitMQ bağlantı hatası:".red.bold, error);
   }
 }
 
 server.on("listening", () => {
-  startOrderCreatedListener();
+  startRabbitMQListeners();
 });
 
 process.on("unhandledRejection", (err, promise) => {

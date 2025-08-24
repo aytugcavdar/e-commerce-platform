@@ -15,62 +15,75 @@ dotenv.config({ path: './.env' });
 
 async function startOrderCreatedListener() {
     try {
-    const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://guest:guest@localhost');
-    const channel = await connection.createChannel();
+        const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://guest:guest@localhost');
+        const channel = await connection.createChannel();
 
-    const exchangeName = 'order_exchange';
-    const queueName = 'product_service_order_created'; 
-    const routingKey = 'order.created';
+        const exchangeName = 'order_exchange';
+        await channel.assertExchange(exchangeName, 'fanout', { durable: false });
 
-    await channel.assertExchange(exchangeName, 'direct', { durable: true });
-    await channel.assertQueue(queueName, { durable: true });
-    await channel.bindQueue(queueName, exchangeName, routingKey);
+        const q = await channel.assertQueue('', { exclusive: true });
+        console.log(`[Product-Service] Geçici kuyruk oluşturuldu: ${q.queue}`.green);
+        
+        channel.bindQueue(q.queue, exchangeName, '');
+        console.log(`[Product-Service] Kuyruk "${exchangeName}" exchange'ine bağlandı. Mesajlar bekleniyor...`.green);
 
-    console.log(`[Product-Service] "${queueName}" kuyruğu dinleniyor.`.green);
+        channel.consume(q.queue, async (msg) => {
+            if (msg !== null) {
+                console.log('[Product-Service] Yeni bir mesaj alındı. Mesaj işleniyor...'.blue);
+                let order;
 
-    channel.consume(queueName, async (msg) => {
-      console.log('[Product-Service] "order.created" mesajı alındı.');
-      console.log('Mesaj içeriği:', msg.content.toString());
-      console.log('Mesaj objesi:', msg);
-        if (msg !== null) {
-          try {
-            const order = JSON.parse(msg.content.toString());
-            console.log('[Product-Service] Yeni sipariş alındı:', JSON.stringify(order, null, 2));
+                try {
+                    console.log('[Product-Service] Gelen Ham Mesaj:', msg.content.toString());
 
-            for (const product of order.products) {
-              console.log(`[Product-Service] Stok güncelleniyor: Ürün ID = ${product._id}, Adet = ${product.quantity}`);
-              
-                const updatedProduct = await Product.findByIdAndUpdate(
-                product._id,
-                console.log(`[Product-Service] "${product._id}" ID'li ürün güncelleniyor.`),
-                console.log(`[Product-Service] Stok azaltılıyor: ${product.quantity}`),
-                console.log("product", product),
-                { $inc: { stock: -product.quantity } },
-                { new: true } // Bu seçenek, güncellenmiş dokümanı döndürür
-              );
+                    const parsedMessage = JSON.parse(msg.content.toString());
+                    order = parsedMessage.order;
 
-              if (updatedProduct) {
-                console.log(`[Product-Service] Stok başarıyla güncellendi. Yeni stok: ${updatedProduct.stock}`, updatedProduct);
-              } else {
-                console.error(`[Product-Service] HATA: ${product._id} ID'li ürün veritabanında bulunamadı!`);
-              }
+                    console.log('[Product-Service] Alınan sipariş detayı:', JSON.stringify(order, null, 2));
+
+                    if (!order || !order.orderItems || order.orderItems.length === 0) {
+                        console.error('[Product-Service] HATA: Sipariş veya sipariş ürünleri (orderItems) mesajda bulunamadı!'.red);
+                        return; // noAck: true olduğu için mesaj zaten silinecek
+                    }
+
+                    console.log(`[Product-Service] ${order.orderItems.length} adet ürün için stok güncelleme işlemi başlatılıyor...`);
+
+                    for (const item of order.orderItems) {
+                        console.log(`[Product-Service] Stok güncelleniyor -> Ürün ID: ${item.productId}, Adet: ${item.quantity}`);
+
+                        const updatedProduct = await Product.findByIdAndUpdate(
+                            item.productId,
+                            { $inc: { stock: -item.quantity } },
+                            { new: true, runValidators: true }
+                        );
+
+                        if (updatedProduct) {
+                            console.log(`[Product-Service] BAŞARILI: ${item.productId} ID'li ürünün stoğu güncellendi. Yeni Stok: ${updatedProduct.stock}`.cyan);
+                        } else {
+                            console.error(`[Product-Service] HATA: ${item.productId} ID'li ürün veritabanında bulunamadı!`.red);
+                        }
+                    }
+
+                    console.log('[Product-Service] Tüm stok güncelleme işlemleri tamamlandı.'.green);
+
+                } catch (error) {
+                    console.error('-----------------------------------------------------'.red);
+                    console.error('[Product-Service] Stok güncellenirken KRİTİK BİR HATA oluştu!'.red.bold);
+                    console.error('Hata Mesajı:', error.message);
+                    console.error('Hatanın Detayları:', error);
+                    if (order) {
+                        console.error('Hataya Neden Olan Sipariş:', JSON.stringify(order, null, 2));
+                    } else {
+                        console.error('Hataya neden olan sipariş bilgisi alınamadı, ham mesaj:', msg.content.toString());
+                    }
+                    console.error('-----------------------------------------------------'.red);
+                }
             }
-            
-            console.log('[Product-Service] Tüm stoklar güncellendi.');
-            channel.ack(msg);
-          } catch (error) {
-            console.error('[Product-Service] Stok güncellenirken bir hata oluştu:', error);
-            // Hata durumunda mesajı reddetmek yerine loglayıp devam edebilir veya
-            // tekrar işlenmesi için nack(msg, false, true) kullanabilirsiniz.
-            channel.ack(msg); 
-          }
-        }
-      });
+        }, { noAck: true });
     } catch (error) {
-        console.error("[Product-Service] RabbitMQ bağlantı hatası:", error);
+        console.error("[Product-Service] RabbitMQ bağlantısı veya kanal oluşturma hatası:".red.bold, error);
     }
 }
-
+startOrderCreatedListener();
 
 // Güvenlik ve Hata Yönetimi Middleware'leri
 const { errorHandler } = require('@e-commerce/shared-utils');
