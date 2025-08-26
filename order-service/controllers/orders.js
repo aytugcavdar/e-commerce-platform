@@ -4,30 +4,28 @@ const axios = require('axios');
 const amqp = require('amqplib'); 
 
 /**
- * RabbitMQ kuyruğuna mesaj yayınlamak için yardımcı fonksiyon.
- * @param {string} queueName - Mesajın gönderileceği kuyruğun adı.
+ * RabbitMQ'da bir exchange'e mesaj yayınlamak için yardımcı fonksiyon.
+ * @param {string} exchangeName - Mesajın yayınlanacağı exchange'in adı.
+ * @param {string} routingKey - Yönlendirme anahtarı (fanout için genellikle boş).
  * @param {object} data - Gönderilecek veri (JSON formatında).
  */
-const publishToQueue = async (queueName, data) => {
+const publishToExchange = async (exchangeName, routingKey, data) => {
     try {
-        // RabbitMQ sunucusuna bağlan
         const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://guest:guest@localhost');
         const channel = await connection.createChannel();
-
-        // Mesajların kaybolmaması için kuyruğun 'durable' olduğundan emin ol
-        await channel.assertQueue(queueName, { durable: true });
-
-        // Mesajı buffer formatında ve 'persistent' olarak kuyruğa gönder
-        channel.sendToQueue(queueName, Buffer.from(JSON.stringify(data)), { persistent: true });
         
-        console.log(`Mesaj "${queueName}" kuyruğuna gönderildi.`.blue);
-
-        // Bağlantıyı kısa bir süre sonra kapat
+        // Exchange'in var olduğundan emin ol
+        await channel.assertExchange(exchangeName, 'fanout', { durable: false });
+        
+        // Mesajı exchange'e yayınla
+        channel.publish(exchangeName, routingKey, Buffer.from(JSON.stringify(data)));
+        
+        console.log(`Mesaj "${exchangeName}" exchange'ine gönderildi.`.blue);
+        
         setTimeout(() => {
             connection.close();
         }, 500);
     } catch (error) {
-        // Hata durumunda sadece konsola log bas, ana işlemi durdurma
         console.error("RabbitMQ'ya mesaj gönderilemedi:", error);
     }
 };
@@ -42,7 +40,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     const userId = req.user.id;
     const userToken = req.cookies.token;
 
-    // 1. ADIM: Cart Service'ten kullanıcının sepetini al (Bu işlem senkron kalmalı)
+    // 1. ADIM: Cart Service'ten kullanıcının sepetini al
     let cart;
     try {
          const { data } = await axios.get('http://localhost:5005/', {
@@ -71,17 +69,14 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
 
     const createdOrder = await order.save();
 
-    // 3. ADIM: "order.created" OLAYINI MESAJ KUYRUĞUNA GÖNDER
-    // Bu mesajı diğer servisler (product, notification, cart) dinleyecek.
+    // 3. ADIM: "order.created" OLAYINI EXCHANGE'E YAYINLA
     const eventData = {
         order: createdOrder,
-        user: req.user, // E-posta gibi bilgiler için
-        token: userToken // Sepeti temizlemek için
+        user: req.user,
+        token: userToken
     };
-    await publishToQueue('order.created', eventData);
+    await publishToExchange('order_exchange', '', eventData);
 
-    // Kullanıcıya anında yanıt dön. Stok düşürme, bildirim gönderme gibi işlemler
-    // artık arka planda asenkron olarak gerçekleşecek.
     res.status(201).json({ success: true, data: createdOrder });
 });
 
@@ -120,7 +115,6 @@ exports.getOrderById = asyncHandler(async (req, res, next) => {
  * @access  Private/Admin
  */
 exports.getAllOrders = asyncHandler(async (req, res, next) => {
-    
     const orders = await Order.find({}).sort({ createdAt: -1 });
     res.status(200).json({ success: true, count: orders.length, data: orders });
 });
@@ -146,12 +140,13 @@ exports.updateOrderStatus = asyncHandler(async (req, res, next) => {
 
     const updatedOrder = await order.save();
 
-    // Sipariş durumu güncellendiğinde de bir olay yayınlayabiliriz.
+    // Sipariş durumu güncellendiğinde de bir olay yayınlıyoruz.
     const eventData = {
         order: updatedOrder,
-        user: { id: order.userId } // Kullanıcı ID'sini gönderiyoruz
+        user: { id: order.userId } 
     };
-    await publishToQueue('order.status.updated', eventData);
+    // DÜZELTME: Eski fonksiyon yerine yenisini kullanıyoruz.
+    await publishToExchange('order_status_updated_exchange', '', eventData);
 
     res.status(200).json({ success: true, data: updatedOrder });
 });

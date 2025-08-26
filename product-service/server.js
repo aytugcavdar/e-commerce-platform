@@ -83,7 +83,7 @@ async function startOrderCreatedListener() {
         console.error("[Product-Service] RabbitMQ bağlantısı veya kanal oluşturma hatası:".red.bold, error);
     }
 }
-startOrderCreatedListener();
+
 
 // Güvenlik ve Hata Yönetimi Middleware'leri
 const { errorHandler } = require('@e-commerce/shared-utils');
@@ -131,9 +131,13 @@ const PORT = process.env.PORT || 5002;
 
 const server = app.listen(
     PORT,
-    console.log(
-        `${process.env.NODE_ENV} modunda çalışan Product Service ${PORT} portunda dinleniyor`.yellow.bold
-    )
+    () => {
+        console.log(
+            `${process.env.NODE_ENV} modunda çalışan Product Service ${PORT} portunda dinleniyor`.yellow.bold
+        );
+        // RabbitMQ dinleyicisini sunucu başladıktan sonra BİR KEZ çağırın.
+        startOrderCreatedListener();
+    }
 );
 
 server.on('listening', () => {

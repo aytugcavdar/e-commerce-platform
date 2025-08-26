@@ -61,35 +61,42 @@ const PORT = process.env.PORT || 5003;
 server.listen(PORT, () => console.log(`Notification Service (HTTP & WebSocket) http://localhost:${PORT} adresinde çalışıyor.`));
 
 // RabbitMQ Dinleyicisini Başlat
+// notification-service/server.js
+
 async function startEventListeners() {
     try {
         const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://guest:guest@localhost');
         const channel = await connection.createChannel();
         
-        // Sipariş oluşturulduğunda e-posta gönder
-        const orderCreatedQueue = 'order.created';
-        await channel.assertQueue(orderCreatedQueue, { durable: true });
-       channel.consume(orderCreatedQueue, async (msg) => {
-    if (msg) {
-        const { order, user } = JSON.parse(msg.content.toString());
-        try {
-            const emailMessage = `Merhaba ${user.firstName},\n\n#${order._id} numaralı siparişiniz başarıyla oluşturulmuştur.\n\nToplam Tutar: ${order.totalPrice} TL`;
-            
-            // Parametre adlarını düzelt
-            await sendEmail({
-                email: user.email,
-                subject: `Siparişiniz Alındı - No: #${order._id}`,
-                message: emailMessage
-            });
-            console.log(`[Notification-Service] Sipariş e-postası gönderildi.`.cyan.bold);
-        } catch (emailError) {
-            console.error("E-posta gönderim hatası:", emailError);
-        }
-        channel.ack(msg);
-    }
-});
+        // Sipariş exchange'ini dinle
+        const orderExchangeName = 'order_exchange';
+        await channel.assertExchange(orderExchangeName, 'fanout', { durable: false });
+        
+        // E-posta gönderimi için geçici bir kuyruk oluştur ve exchange'e bağla
+        const q_email = await channel.assertQueue('', { exclusive: true });
+        channel.bindQueue(q_email.queue, orderExchangeName, '');
 
-        // Sipariş durumu güncellendiğinde anlık bildirim gönder
+        console.log('[Notification-Service] Sipariş exchange\'i dinleniyor...'.green);
+
+        channel.consume(q_email.queue, async (msg) => {
+            if (msg) {
+                const { order, user } = JSON.parse(msg.content.toString());
+                try {
+                    const emailMessage = `Merhaba ${user.firstName},\n\n#${order._id} numaralı siparişiniz başarıyla oluşturulmuştur.\n\nToplam Tutar: ${order.totalPrice} TL`;
+                    
+                    await sendEmail({
+                        email: user.email,
+                        subject: `Siparişiniz Alındı - No: #${order._id}`,
+                        message: emailMessage
+                    });
+                    console.log(`[Notification-Service] Sipariş e-postası gönderildi.`.cyan.bold);
+                } catch (emailError) {
+                    console.error("E-posta gönderim hatası:", emailError);
+                }
+            }
+        }, { noAck: true });
+
+        // ✅ Sipariş durumu güncellendiğinde anlık bildirim gönder
         const orderUpdatedQueue = 'order.status.updated';
         await channel.assertQueue(orderUpdatedQueue, { durable: true });
         channel.consume(orderUpdatedQueue, (msg) => {
