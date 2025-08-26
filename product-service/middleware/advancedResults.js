@@ -13,6 +13,7 @@ const advancedResults = (model, populate) => async (req, res, next) => {
 
     // MongoDB operatörleri ($gt, $gte, vb.) için düzenleme
     queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
+    console.log('Sorgu Stringi:', queryStr);
 
     // Modeli sorgula
     query = model.find(JSON.parse(queryStr));
