@@ -50,6 +50,13 @@ export const productsApiSlice = apiSlice.injectEndpoints({
             query: (id) => `/products/${id}/with-category`,
             providesTags: (result, error, id) => [{ type: 'Product', id }],
         }),
+        searchProducts: builder.query<ApiResponse<Product[]>, string>({
+            query: (searchTerm) => `/search?q=${encodeURIComponent(searchTerm)}`,
+            providesTags: (result) =>
+                result?.data
+                ? [...result.data.map(({ _id }) => ({ type: 'Product' as const, id: _id })), { type: 'Product', id: 'LIST' }]
+                : [{ type: 'Product', id: 'LIST' }],
+        }),
     })
 });
 
@@ -60,5 +67,6 @@ export const {
     useUpdateProductMutation,
     useDeleteProductMutation,
     useUploadProductImagesMutation,
-    useGetProductWithCategoryQuery
+    useGetProductWithCategoryQuery,
+    useLazySearchProductsQuery
 } = productsApiSlice;

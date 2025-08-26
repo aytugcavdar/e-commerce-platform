@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logOut, selectCurrentUser } from '../features/auth/authSlice';
+import SearchBar from './SearchBar';
 
 const Navbar: React.FC = () => {
   const user = useSelector(selectCurrentUser);
@@ -85,6 +86,10 @@ const Navbar: React.FC = () => {
               </NavLink>
             </li>
           </ul>
+        </div>
+         {/* Navbar Center - Arama Çubuğu */}
+        <div className="navbar-center hidden lg:flex">
+            <SearchBar />
         </div>
 
         {/* Right side - User menu */}

@@ -92,6 +92,14 @@ app.use('/api/payments', createProxyMiddleware({
     target: 'http://localhost:5007',
     pathRewrite: { '^/api/payments': '/' },
 }));
+// Search servis
+app.use('/api/search', createProxyMiddleware({
+    ...commonProxyOptions,
+    
+    target: 'http://search-service:5008', 
+    pathRewrite: { '^/api/search': '/' },
+    logLevel: 'debug'
+}));
 
 // 404 Handler - Express 5 uyumlu
 app.use((req, res) => {
