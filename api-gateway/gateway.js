@@ -93,13 +93,19 @@ app.use('/api/payments', createProxyMiddleware({
     pathRewrite: { '^/api/payments': '/' },
 }));
 // Search servis
-app.use('/api/search', createProxyMiddleware({
-    ...commonProxyOptions,
-    
-    target: 'http://search-service:5008', 
-    pathRewrite: { '^/api/search': '/' },
-    logLevel: 'debug'
-}));
+const searchProxy = createProxyMiddleware({
+    target: 'http://localhost:5008', // 1. Değişiklik: Hedef localhost olmalı.
+    changeOrigin: true,
+    pathRewrite: {
+        '^/api/search': '', // 2. Değişiklik: /api/search kısmını tamamen kaldır.
+    },
+    logLevel: 'debug', // Hata ayıklama için detaylı logları göster.
+    onError: (err, req, res) => {
+        console.error('[API Gateway] PROXY HATASI:', err);
+        res.status(500).send('Proxy hatası oluştu. Hedef servis çalışmıyor olabilir.');
+    },
+});
+app.use('/api/search', searchProxy);
 
 // 404 Handler - Express 5 uyumlu
 app.use((req, res) => {

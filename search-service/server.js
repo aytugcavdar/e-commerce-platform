@@ -1,42 +1,52 @@
 const express = require('express');
 const { Client } = require('@elastic/elasticsearch');
-const amqp = require('amqplib');
+const cors = require('cors');
 
 const app = express();
-app.use(express.json());
+app.use(cors());
 
-// Elasticsearch bağlantısı
-const esClient = new Client({ node: 'http://localhost:9200' });
+console.log('[Search Service] Başlatılıyor...');
 
-// Arama endpoint'i
+// Elasticsearch client'ını yapılandırıyoruz.
+// Adres doğru, bağlantıyı istek geldiğinde deneyecek.
+const client = new Client({ node: 'http://localhost:9200' });
+
 app.get('/', async (req, res) => {
     const { q } = req.query;
+    console.log(`[Search Service] Arama isteği alındı. Sorgu: "${q}"`);
+
+    if (!q) {
+        return res.status(400).json({ message: 'Arama yapmak için "q" parametresi zorunludur.' });
+    }
+    
     try {
-        const { body } = await esClient.search({
+        const { body } = await client.search({
             index: 'products',
             body: {
                 query: {
                     multi_match: {
                         query: q,
-                        fields: ['name', 'description', 'category.name']
-                    }
-                }
-            }
+                        fields: ['name', 'description', 'category'],
+                    },
+                },
+            },
         });
-        res.json(body.hits.hits.map(hit => hit._source));
+        
+        const results = body.hits.hits.map(hit => hit._source);
+        console.log(`[Search Service] "${q}" sorgusu için ${results.length} sonuç bulundu.`);
+        res.json(results);
+
     } catch (error) {
-        res.status(500).send('Arama sırasında hata oluştu.');
+        // Hata olursa, burada detaylı olarak göreceğiz.
+        console.error('[Search Service] KRİTİK HATA: Elasticsearch ile iletişim kurulamadı.', error.meta.body);
+        res.status(500).send('Arama servisi veritabanına bağlanamadı.');
     }
 });
 
-// product-service'ten gelen mesajları dinleyerek Elasticsearch'ü güncel tut
-async function startProductSyncListener() {
-    // ... RabbitMQ dinleme kodu ...
-    // 'product.created', 'product.updated' gibi mesajları dinle
-    // Gelen mesaja göre esClient.index(), esClient.update() veya esClient.delete() yap.
-}
+const PORT = 5008;
 
-app.listen(5008, () => {
-    console.log('Search Service 5008 portunda çalışıyor.');
-    startProductSyncListener();
+// Sunucuyu doğrudan başlatıyoruz.
+app.listen(PORT, () => {
+    console.log(`[Search Service] Elasticsearch bağlantısı hazır.`);
+    console.log(`[Search Service] http://localhost:${PORT} adresinde başarıyla başlatıldı.`);
 });

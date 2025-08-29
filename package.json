@@ -15,7 +15,7 @@
   ],
   "description": "E-ticaret projesinin ana yöneticisi",
   "scripts": {
-    "start": "concurrently \"npm run start:gateway\" \"npm run start:auth\" \"npm run start:product\" \"npm run start:category\" \"npm run start:cart\" \"npm run start:order\" \"npm run start:payment\" \"npm run start:notification\"",
+    "start": "concurrently \"npm run start:gateway\" \"npm run start:auth\" \"npm run start:product\" \"npm run start:category\" \"npm run start:cart\" \"npm run start:order\" \"npm run start:payment\" \"npm run start:notification\" \"npm run start:search\"",
     "start:gateway": "cd api-gateway && nodemon gateway.js",
     "start:auth": "cd auth-service && nodemon server.js",
     "start:product": "cd product-service && nodemon server.js",
@@ -24,6 +24,7 @@
     "start:order": "cd order-service && nodemon server.js",
     "start:payment": "cd payment-service && nodemon server.js",
     "start:notification": "cd notification-service && nodemon server.js",
+    "start:search": "cd search-service && nodemon server.js",
     "install:all": "npm install --workspaces"
   },
   "devDependencies": {
