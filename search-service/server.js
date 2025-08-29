@@ -3,12 +3,10 @@ const { Client } = require('@elastic/elasticsearch');
 const cors = require('cors');
 
 const app = express();
-app.use(cors());
+
 
 console.log('[Search Service] Başlatılıyor...');
 
-// Elasticsearch client'ını yapılandırıyoruz.
-// Adres doğru, bağlantıyı istek geldiğinde deneyecek.
 const client = new Client({ node: 'http://localhost:9200' });
 
 app.get('/', async (req, res) => {
@@ -20,32 +18,30 @@ app.get('/', async (req, res) => {
     }
     
     try {
-        const { body } = await client.search({
+       
+        const response = await client.search({
             index: 'products',
-            body: {
-                query: {
-                    multi_match: {
-                        query: q,
-                        fields: ['name', 'description', 'category'],
-                    },
+            query: {
+                multi_match: {
+                    query: q,
+                    fields: ['name', 'description', 'category'],
                 },
             },
         });
         
-        const results = body.hits.hits.map(hit => hit._source);
+        
+        const results = response.hits.hits.map(hit => hit._source);
         console.log(`[Search Service] "${q}" sorgusu için ${results.length} sonuç bulundu.`);
         res.json(results);
 
     } catch (error) {
-        // Hata olursa, burada detaylı olarak göreceğiz.
-        console.error('[Search Service] KRİTİK HATA: Elasticsearch ile iletişim kurulamadı.', error.meta.body);
-        res.status(500).send('Arama servisi veritabanına bağlanamadı.');
+        console.error('[Search Service] KRİTİK HATA: Elasticsearch araması başarısız oldu. Asıl Hata:', error);
+        res.status(500).send('Arama servisi veritabanına bağlanamadı veya arama sırasında bir hata oluştu.');
     }
 });
 
 const PORT = 5008;
 
-// Sunucuyu doğrudan başlatıyoruz.
 app.listen(PORT, () => {
     console.log(`[Search Service] Elasticsearch bağlantısı hazır.`);
     console.log(`[Search Service] http://localhost:${PORT} adresinde başarıyla başlatıldı.`);
