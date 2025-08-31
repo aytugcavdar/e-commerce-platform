@@ -45,17 +45,17 @@ export const productsApiSlice = apiSlice.injectEndpoints({
             }),
             invalidatesTags: (result, error, arg) => [{ type: 'Product', id: arg.id }]
         }),
-        // URL düzeltmesi: çift slash sorunu giderildi
         getProductWithCategory: builder.query<ApiResponse<Product>, string>({
             query: (id) => `/products/${id}/with-category`,
             providesTags: (result, error, id) => [{ type: 'Product', id }],
         }),
-        searchProducts: builder.query<ApiResponse<Product[]>, string>({
+        // Search endpoint'i - backend direkt array döndürdüğü için Product[] tipini kullan
+        searchProducts: builder.query<Product[], string>({
             query: (searchTerm) => `/search?q=${encodeURIComponent(searchTerm)}`,
             providesTags: (result) =>
-                result?.data
-                ? [...result.data.map(({ _id }) => ({ type: 'Product' as const, id: _id })), { type: 'Product', id: 'LIST' }]
-                : [{ type: 'Product', id: 'LIST' }],
+                result
+                ? [...result.map(({ _id }) => ({ type: 'Product' as const, id: _id })), { type: 'Product', id: 'SEARCH' }]
+                : [{ type: 'Product', id: 'SEARCH' }],
         }),
     })
 });
