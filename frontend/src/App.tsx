@@ -13,24 +13,31 @@ import PersistLogin from './features/auth/PersistLogin';
 import './App.css';
 import { ToastContainer } from 'react-toastify';
 
-// YENİ SAYFALARI ve ADMIN ROUTE'u import edin
+// Admin route ve sayfalar
 import AdminRoute from './components/AdminRoute';
 import AdminDashboard from './pages/AdminDashboard';
 import AddProductPage from './pages/AddProductPage';
 import ManageProductsPage from './pages/ManageProductsPage';
-
-import PaymentPage from './pages/PaymentPage'; 
-import OrderDetailPage from './pages/OrderDetailPage';
 import ManageOrdersPage from './pages/ManageOrdersPage';
 import EditProductPage from './pages/EditProductPage';
 import ManageUsersPage from './pages/ManageUsersPage';
 
+// Diğer sayfalar
+import PaymentPage from './pages/PaymentPage'; 
+import OrderDetailPage from './pages/OrderDetailPage';
+
+// Yeni: NotFoundPage
+import NotFoundPage from './pages/NotFoundPage';
+
 function App() {
   return (
     <Router>
+      
+      <ToastContainer position="bottom-right" autoClose={3000} />
+
       <div className="flex flex-col min-h-screen">
         <Navbar />
-        <main className="flex-grow container mx-auto p-4">
+        <main className="flex-grow w-full px-4 sm:px-6 lg:px-8 py-8">
           <Routes>
             <Route element={<PersistLogin />}>
               {/* Genel Rotalar */}
@@ -43,21 +50,24 @@ function App() {
               <Route path="/profile/orders/:orderId" element={<OrderDetailPage />} />
               <Route path="/profile" element={<ProfilePage />} />
 
-
               {/* Admin Rotaları */}
               <Route element={<AdminRoute />}>
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/products/add" element={<AddProductPage />} />
-                <Route path="/admin/categories" element={<CategoryAdminPage />} />
-                <Route path="/admin/products" element={<ManageProductsPage />} />
-                <Route path="/admin/orders" element={<ManageOrdersPage />} />
-                 <Route path="/admin/products/edit/:productId" element={<EditProductPage />} />
-                 <Route path="/admin/users" element={<ManageUsersPage />} />
+                <Route path="/admin">
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="products" element={<ManageProductsPage />} />
+                  <Route path="products/add" element={<AddProductPage />} />
+                  <Route path="products/edit/:productId" element={<EditProductPage />} />
+                  <Route path="categories" element={<CategoryAdminPage />} />
+                  <Route path="orders" element={<ManageOrdersPage />} />
+                  <Route path="users" element={<ManageUsersPage />} />
+                </Route>
               </Route>
             </Route>
+
+            {/* 404 Sayfası */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
-        <ToastContainer position="bottom-right" autoClose={3000} />
         <Footer />
       </div>
     </Router>
