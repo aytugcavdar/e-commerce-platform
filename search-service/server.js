@@ -118,9 +118,6 @@ function startProductListeners() {
     }
 }
 
-// =========================================================================
-//                   ARAMA ENDPOINT'İ (DÜZELTİLDİ)
-// =========================================================================
 app.get('/', async (req, res) => {
     const { q } = req.query;
     console.log(`[Search Service] Arama isteği alındı. Sorgu: "${q}"`);
@@ -130,20 +127,23 @@ app.get('/', async (req, res) => {
     }
     
     try {
-        // Elasticsearch sürüm uyumluluğu için her iki formatı da dene
         const searchParams = {
             index: 'products',
             body: {
                 query: {
                     multi_match: {
                         query: q,
-                        fields: ['name', 'description', 'category'],
-                        fuzziness: "AUTO"
-                    },
-                },
+                        fields: [
+                            'name^3',         
+                            'description',
+                            'category'
+                        ],
+                        fuzziness: "AUTO", 
+                        type: "best_fields"
+                    }
+                }
             }
         };
-
         console.log('[Search Service] Elasticsearch sorgusu gönderiliyor...'.cyan);
         const response = await client.search(searchParams);
         
@@ -179,9 +179,6 @@ app.get('/', async (req, res) => {
     }
 });
 
-// =========================================================================
-//                       SUNUCUYU BAŞLATMA
-// =========================================================================
 app.listen(PORT, async () => {
     console.log(`[Search Service] http://localhost:${PORT} adresinde başarıyla başlatıldı.`.green.bold);
     await indexExistingProducts();

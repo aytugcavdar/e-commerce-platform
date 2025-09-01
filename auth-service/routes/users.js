@@ -4,7 +4,9 @@ const {
     getUser,
     updateUser,
     deleteUser,
-    updateMe
+    updateMe,
+    updateProfile,
+    updateFavorites
 } = require('../controllers/users');
 const User = require('../models/User'); // Model import et
 const { authMiddleware } = require('@e-commerce/shared-utils');
@@ -24,6 +26,8 @@ router.route('/')
         advancedResults(User), // advancedResults middleware'ini ekle
         getUsers
     );
+router.put('/profile', updateProfile);
+router.put('/favorites', updateFavorites);
 
 router.route('/:id')
     .get(authorize('admin'), getUser)

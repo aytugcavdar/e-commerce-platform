@@ -59,6 +59,17 @@ const UserSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
+   address: {
+    street: String,
+    city: String,
+    zipCode: String,
+  },
+  favorites: [
+    {
+      type: mongoose.Schema.ObjectId,
+      ref: 'Product', // Product modeline referans veriyoruz
+    },
+  ],
   isActive: {
     type: Boolean,
     default: true

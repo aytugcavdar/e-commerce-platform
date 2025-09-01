@@ -19,6 +19,22 @@ export const usersApiSlice = apiSlice.injectEndpoints({
             }),
             invalidatesTags: (result, error, { id }) => [{ type: 'User', id }, { type: 'User', id: 'LIST' }]
         }),
+        updateProfile: builder.mutation<User, Partial<User>>({
+        query: (initialProfileData) => ({
+            url: '/users/profile',
+            method: 'PUT',
+            body: { ...initialProfileData },
+        }),
+        invalidatesTags: ['User'],
+    }),
+    updateFavorites: builder.mutation<{ success: boolean; data: string[] }, { productId: string }>({
+        query: ({ productId }) => ({
+            url: '/users/favorites',
+            method: 'PUT',
+            body: { productId },
+        }),
+        invalidatesTags: ['User'],
+    }),
     })
     
 });
@@ -26,4 +42,4 @@ console.log('usersApiSlice loaded');
 console.log(usersApiSlice.endpoints.getUsers);
 
 
-export const { useGetUsersQuery, useUpdateUserMutation } = usersApiSlice;
+export const { useGetUsersQuery, useUpdateUserMutation, useUpdateProfileMutation, useUpdateFavoritesMutation } = usersApiSlice;
