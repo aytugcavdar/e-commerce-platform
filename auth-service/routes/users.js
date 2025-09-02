@@ -4,7 +4,11 @@ const {
     getUser,
     updateUser,
     deleteUser,
-    updateMe
+    updateMe,
+    addAddress,
+    updateAddress,
+    deleteAddress,
+    setDefaultAddress
 } = require('../controllers/users');
 const User = require('../models/User'); // Model import et
 const { authMiddleware } = require('@e-commerce/shared-utils');
@@ -24,6 +28,15 @@ router.route('/')
         advancedResults(User), // advancedResults middleware'ini ekle
         getUsers
     );
+router.route('/address').post(addAddress);
+
+router
+    .route('/address/:addressId')
+    .put(updateAddress)
+    .delete(deleteAddress);
+
+router.route('/address/default/:addressId').put(setDefaultAddress);
+
 
 router.route('/:id')
     .get(authorize('admin'), getUser)

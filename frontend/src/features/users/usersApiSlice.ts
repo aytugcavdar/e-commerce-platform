@@ -19,22 +19,36 @@ export const usersApiSlice = apiSlice.injectEndpoints({
             }),
             invalidatesTags: (result, error, { id }) => [{ type: 'User', id }, { type: 'User', id: 'LIST' }]
         }),
-        updateProfile: builder.mutation<User, Partial<User>>({
-        query: (initialProfileData) => ({
-            url: '/users/profile',
-            method: 'PUT',
-            body: { ...initialProfileData },
+        addAddress: builder.mutation({
+            query: (address) => ({
+                url: '/users/address',
+                method: 'POST',
+                body: address,
+            }),
+            invalidatesTags: [{ type: 'User', id: 'ME' }],
         }),
-        invalidatesTags: ['User'],
-    }),
-    updateFavorites: builder.mutation<{ success: boolean; data: string[] }, { productId: string }>({
-        query: ({ productId }) => ({
-            url: '/users/favorites',
-            method: 'PUT',
-            body: { productId },
+        updateAddress: builder.mutation({
+            query: ({ addressId, ...address }) => ({
+                url: `/users/address/${addressId}`,
+                method: 'PUT',
+                body: address,
+            }),
+            invalidatesTags: [{ type: 'User', id: 'ME' }],
         }),
-        invalidatesTags: ['User'],
-    }),
+        deleteAddress: builder.mutation({
+            query: (addressId) => ({
+                url: `/users/address/${addressId}`,
+                method: 'DELETE',
+            }),
+            invalidatesTags: [{ type: 'User', id: 'ME' }],
+        }),
+        setDefaultAddress: builder.mutation({
+            query: (addressId) => ({
+                url: `/users/address/default/${addressId}`,
+                method: 'PUT',
+            }),
+            invalidatesTags: [{ type: 'User', id: 'ME' }],
+        }),
     })
     
 });
@@ -42,4 +56,4 @@ console.log('usersApiSlice loaded');
 console.log(usersApiSlice.endpoints.getUsers);
 
 
-export const { useGetUsersQuery, useUpdateUserMutation, useUpdateProfileMutation, useUpdateFavoritesMutation } = usersApiSlice;
+export const { useGetUsersQuery, useUpdateUserMutation, useAddAddressMutation, useUpdateAddressMutation, useDeleteAddressMutation, useSetDefaultAddressMutation } = usersApiSlice;

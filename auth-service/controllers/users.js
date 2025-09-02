@@ -102,3 +102,127 @@ exports.deleteUser = asyncHandler(async (req, res, next) => {
 
     res.status(200).json({ success: true, data: {} });
 });
+// @desc      Add a new address
+// @route     POST /api/v1/users/address
+// @access    Private
+exports.addAddress = asyncHandler(async (req, res, next) => {
+    const { name, street, city, zipCode, isDefault } = req.body;
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        return next(new ErrorResponse('User not found', 404));
+    }
+
+    if (isDefault) {
+        user.addresses.forEach(address => {
+            address.isDefault = false;
+        });
+    }
+
+    const newAddress = {
+        name,
+        street,
+        city,
+        zipCode,
+        isDefault: isDefault || user.addresses.length === 0,
+    };
+
+    user.addresses.push(newAddress);
+    await user.save();
+
+    res.status(201).json({
+        success: true,
+        data: user.addresses,
+    });
+});
+
+
+// @desc      Update an address
+// @route     PUT /api/v1/users/address/:addressId
+// @access    Private
+exports.updateAddress = asyncHandler(async (req, res, next) => {
+    const { name, street, city, zipCode, isDefault } = req.body;
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        return next(new ErrorResponse('User not found', 404));
+    }
+
+    const address = user.addresses.id(req.params.addressId);
+
+    if (!address) {
+        return next(new ErrorResponse('Address not found', 404));
+    }
+
+    if (isDefault) {
+        user.addresses.forEach(addr => {
+            addr.isDefault = false;
+        });
+    }
+
+    address.name = name || address.name;
+    address.street = street || address.street;
+    address.city = city || address.city;
+    address.zipCode = zipCode || address.zipCode;
+    address.isDefault = isDefault !== undefined ? isDefault : address.isDefault;
+
+    await user.save();
+
+    res.status(200).json({
+        success: true,
+        data: user.addresses,
+    });
+});
+
+// @desc      Delete an address
+// @route     DELETE /api/v1/users/address/:addressId
+// @access    Private
+exports.deleteAddress = asyncHandler(async (req, res, next) => {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        return next(new ErrorResponse('User not found', 404));
+    }
+
+    const address = user.addresses.id(req.params.addressId);
+
+    if (!address) {
+        return next(new ErrorResponse('Address not found', 404));
+    }
+
+    if (address.isDefault && user.addresses.length > 1) {
+        user.addresses.pull({ _id: req.params.addressId });
+        user.addresses[0].isDefault = true;
+    } else {
+        user.addresses.pull({ _id: req.params.addressId });
+    }
+
+    await user.save();
+
+    res.status(200).json({
+        success: true,
+        data: user.addresses,
+    });
+});
+
+// @desc      Set a default address
+// @route     PUT /api/v1/users/address/default/:addressId
+// @access    Private
+exports.setDefaultAddress = asyncHandler(async (req, res, next) => {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        return next(new ErrorResponse('User not found', 404));
+    }
+
+    user.addresses.forEach(address => {
+        address.isDefault = address._id.toString() === req.params.addressId;
+    });
+
+    await user.save();
+
+    res.status(200).json({
+        success: true,
+        data: user.addresses,
+    });
+});

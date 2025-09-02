@@ -4,6 +4,32 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
+
+const AddressSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: [true, 'Please add a name for the address'],
+        trim: true,
+    },
+    street: {
+        type: String,
+        required: [true, 'Please add a street'],
+    },
+    city: {
+        type: String,
+        required: [true, 'Please add a city'],
+    },
+    zipCode: {
+        type: String,
+        required: [true, 'Please add a zip code'],
+    },
+    isDefault: {
+        type: Boolean,
+        default: false,
+    },
+});
+
+
 const UserSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -59,11 +85,7 @@ const UserSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
-   address: {
-    street: String,
-    city: String,
-    zipCode: String,
-  },
+  addresses: [AddressSchema],
   favorites: [
     {
       type: mongoose.Schema.ObjectId,

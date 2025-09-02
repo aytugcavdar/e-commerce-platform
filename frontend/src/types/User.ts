@@ -1,3 +1,12 @@
+export interface Address {
+    _id: string;
+    name: string;
+    street: string;
+    city: string;
+    zipCode: string;
+    isDefault: boolean;
+}
+
 export interface User {
   id: string;
   username: string;
@@ -5,6 +14,7 @@ export interface User {
   firstName: string;
   lastName: string;
   fullName: string;
+  addresses?: Address[];
   avatar?: {
     public_id: string | null;
     url: string | null;
