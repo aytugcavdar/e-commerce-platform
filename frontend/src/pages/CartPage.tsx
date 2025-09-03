@@ -1,14 +1,32 @@
 import React from 'react';
-import { useGetCartQuery } from '../features/cart/cartApiSlice'; // Eksik importu ekleyin
+import { useGetCartQuery, useUpdateCartItemMutation, useRemoveFromCartMutation } from '../features/cart/cartApiSlice';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Cart, ApiResponse } from '../../types';
 
 const CartPage: React.FC = () => {
   const { data: cartResponse, isLoading, isSuccess } = useGetCartQuery<ApiResponse<Cart>>(undefined);
-  // Sepetten silme işlemini daha sonra ekleyeceğiz. Şimdilik yorum satırı olarak kalsın.
-  // const [removeFromCart, { isLoading: isRemoving }] = useRemoveFromCartMutation(); 
+  const [updateCartItem, { isLoading: isUpdating }] = useUpdateCartItemMutation();
+  const [removeFromCart, { isLoading: isRemoving }] = useRemoveFromCartMutation();
   const navigate = useNavigate();
+
+  const handleQuantityChange = async (productId: string, quantity: number) => {
+    if (quantity < 1) return;
+    try {
+      await updateCartItem({ productId, quantity }).unwrap();
+    } catch (error) {
+      toast.error("Sepet güncellenemedi.");
+    }
+  };
+
+  const handleRemove = async (productId: string) => {
+    try {
+      await removeFromCart({ productId }).unwrap();
+      toast.success("Ürün sepetten çıkarıldı.");
+    } catch (error) {
+      toast.error("Ürün sepetten çıkarılamadı.");
+    }
+  };
   
   const handleCheckout = () => {
     navigate('/checkout');
@@ -48,10 +66,34 @@ const CartPage: React.FC = () => {
                   </div>
                 </td>
                 <td>{item.price} TL</td>
-                <td>{item.quantity}</td>
+                <td>
+                  <div className="flex items-center">
+                    <button
+                      className="btn btn-ghost btn-xs"
+                      onClick={() => handleQuantityChange(item.productId, item.quantity - 1)}
+                      disabled={isUpdating}
+                    >
+                      -
+                    </button>
+                    <span className="mx-2">{item.quantity}</span>
+                    <button
+                      className="btn btn-ghost btn-xs"
+                      onClick={() => handleQuantityChange(item.productId, item.quantity + 1)}
+                      disabled={isUpdating}
+                    >
+                      +
+                    </button>
+                  </div>
+                </td>
                 <td>{item.price * item.quantity} TL</td>
                 <th>
-                  <button className="btn btn-ghost btn-xs">Sil</button>
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    onClick={() => handleRemove(item.productId)}
+                    disabled={isRemoving}
+                  >
+                    Sil
+                  </button>
                 </th>
               </tr>
             ))}
