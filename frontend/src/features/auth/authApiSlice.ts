@@ -25,7 +25,8 @@ export const authApiSlice = apiSlice.injectEndpoints({
     }),
         getMe: builder.query<ApiResponse<{ user: User }>, void>({
             query: () => '/auth/me',
-            providesTags: ['User']
+            
+            providesTags: (result) => result ? [{ type: 'User', id: 'ME' }] : [],
         }),
          updateMe: builder.mutation<ApiResponse<{ user: User }>, FormData>({
             query: (formData) => ({

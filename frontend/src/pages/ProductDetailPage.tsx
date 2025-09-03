@@ -1,11 +1,17 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useGetProductWithCategoryQuery } from '../features/products/productsApiSlice';
+import { useAddToCartMutation } from '../features/cart/cartApiSlice';
+import { useNotify } from '../hooks/useNotify';
 import { FaShoppingCart, FaHeart, FaShare, FaStar, FaBox, FaCheckCircle, FaTimesCircle, FaPlus, FaMinus } from 'react-icons/fa';
 
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const [quantity, setQuantity] = useState(1);
+  
+  // Sepete ekleme hook'u ve notification hook'u eklendi
+  const [addToCart, { isLoading: isAddingToCart }] = useAddToCartMutation();
+  const notify = useNotify();
 
   const {
     data: product,
@@ -68,9 +74,15 @@ const ProductDetailPage = () => {
     }
   };
 
-  const handleAddToCart = () => {
-    console.log(`Sepete ekleniyor: ${productData.name}, Adet: ${quantity}`);
-    // Burada sepete ekleme işlemi yapılacak
+  // Sepete ekleme fonksiyonu düzeltildi
+  const handleAddToCart = async () => {
+    try {
+      await addToCart({ productId: productData._id, quantity }).unwrap();
+      notify.success(`${quantity} adet ${productData.name} sepete eklendi!`);
+    } catch (err) {
+      notify.error('Ürün sepete eklenemedi!');
+      console.error('Sepete eklenemedi:', err);
+    }
   };
 
   return (
@@ -231,11 +243,20 @@ const ProductDetailPage = () => {
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button 
                     onClick={handleAddToCart}
-                    className={`btn btn-primary flex-1 gap-2 ${!isInStock ? 'btn-disabled' : ''}`}
-                    disabled={!isInStock}
+                    className={`btn btn-primary flex-1 gap-2 ${!isInStock || isAddingToCart ? 'btn-disabled' : ''}`}
+                    disabled={!isInStock || isAddingToCart}
                   >
-                    <FaShoppingCart />
-                    {isInStock ? `Sepete Ekle (${quantity} adet)` : 'Stokta Yok'}
+                    {isAddingToCart ? (
+                      <>
+                        <span className="loading loading-spinner loading-xs"></span>
+                        Ekleniyor...
+                      </>
+                    ) : (
+                      <>
+                        <FaShoppingCart />
+                        {isInStock ? `Sepete Ekle (${quantity} adet)` : 'Stokta Yok'}
+                      </>
+                    )}
                   </button>
                   
                   <button className="btn btn-outline btn-secondary gap-2">

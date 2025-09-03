@@ -257,6 +257,7 @@ exports.getMe = asyncHandler(async (req, res, next) => {
         emailVerified: user.emailVerified,
         lastLogin: user.lastLogin,
         createdAt: user.createdAt,
+        addresses: user.addresses,
       },
     },
   });
