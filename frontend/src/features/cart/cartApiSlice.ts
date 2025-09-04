@@ -30,9 +30,9 @@ export const cartApiSlice = apiSlice.injectEndpoints({
             }),
             invalidatesTags: ['Cart'],
         }),
-        clearCart: builder.mutation<void, void>({
+        clearCart: builder.mutation<ApiResponse<{ message: string }>, void>({
             query: () => ({
-                url: '/cart/clear',
+                url: '/cart',
                 method: 'DELETE',
             }),
             invalidatesTags: ['Cart'],

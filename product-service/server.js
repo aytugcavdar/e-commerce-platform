@@ -13,6 +13,7 @@ const Product = require('./models/Product');
 // .env dosyasını yükle
 dotenv.config({ path: './.env' });
 
+
 async function startOrderCreatedListener() {
     try {
         const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://guest:guest@localhost');
@@ -21,8 +22,14 @@ async function startOrderCreatedListener() {
         const exchangeName = 'order_exchange';
         await channel.assertExchange(exchangeName, 'fanout', { durable: false });
 
-        const q = await channel.assertQueue('', { exclusive: true });
-        console.log(`[Product-Service] Geçici kuyruk oluşturuldu: ${q.queue}`.green);
+        // Her service için benzersiz bir kuyruk adı kullan
+        const queueName = 'product_service_orders';
+        const q = await channel.assertQueue(queueName, { 
+            exclusive: false, // Exclusive false yaparak kuyrukun kalıcı olmasını sağlayın
+            durable: true 
+        });
+        
+        console.log(`[Product-Service] Kalıcı kuyruk oluşturuldu: ${q.queue}`.green);
         
         channel.bindQueue(q.queue, exchangeName, '');
         console.log(`[Product-Service] Kuyruk "${exchangeName}" exchange'ine bağlandı. Mesajlar bekleniyor...`.green);
@@ -42,7 +49,9 @@ async function startOrderCreatedListener() {
 
                     if (!order || !order.orderItems || order.orderItems.length === 0) {
                         console.error('[Product-Service] HATA: Sipariş veya sipariş ürünleri (orderItems) mesajda bulunamadı!'.red);
-                        return; // noAck: true olduğu için mesaj zaten silinecek
+                        // Mesajı reddet ve requeue etme
+                        channel.nack(msg, false, false);
+                        return;
                     }
 
                     console.log(`[Product-Service] ${order.orderItems.length} adet ürün için stok güncelleme işlemi başlatılıyor...`);
@@ -65,6 +74,7 @@ async function startOrderCreatedListener() {
 
                     console.log('[Product-Service] Tüm stok güncelleme işlemleri tamamlandı.'.green);
 
+                    // Mesajı başarılı olarak işaretla
                     channel.ack(msg);
 
                 } catch (error) {
@@ -78,9 +88,13 @@ async function startOrderCreatedListener() {
                         console.error('Hataya neden olan sipariş bilgisi alınamadı, ham mesaj:', msg.content.toString());
                     }
                     console.error('-----------------------------------------------------'.red);
+                    
+                    // Hata durumunda mesajı reddet ve requeue etme
+                    channel.nack(msg, false, false);
                 }
             }
-        }, { noAck: true });
+        }, { noAck: false }); // noAck false yaparak manual acknowledgment kullan
+
     } catch (error) {
         console.error("[Product-Service] RabbitMQ bağlantısı veya kanal oluşturma hatası:".red.bold, error);
     }
