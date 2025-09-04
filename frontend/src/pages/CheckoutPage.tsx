@@ -57,9 +57,10 @@ const CheckoutPage: React.FC = () => {
     const orderData = {
       orderItems: validOrderItems,
       shippingAddress: {
-        street: address.street,
+        address: address.street,
         city: address.city,
-        zipCode: address.zipCode,
+        postalCode: address.zipCode,
+        country: address.country || 'TURKEY',
       },
       paymentMethod: 'Stripe',
       totalPrice: cart?.totalPrice,

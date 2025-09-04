@@ -65,6 +65,8 @@ async function startOrderCreatedListener() {
 
                     console.log('[Product-Service] Tüm stok güncelleme işlemleri tamamlandı.'.green);
 
+                    channel.ack(msg);
+
                 } catch (error) {
                     console.error('-----------------------------------------------------'.red);
                     console.error('[Product-Service] Stok güncellenirken KRİTİK BİR HATA oluştu!'.red.bold);

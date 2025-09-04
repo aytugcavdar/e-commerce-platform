@@ -132,8 +132,22 @@ exports.removeItemFromCart = asyncHandler(async (req, res, next) => {
 // @route   DELETE /api/cart
 // @access  Private
 exports.clearCart = asyncHandler(async (req, res, next) => {
-    const userId = req.user.id;
-    await Cart.findOneAndDelete({ userId });
-    console.log(`🧹 Sepet temizlendi: ${userId}`);
-    res.status(200).json({ success: true, data: {} });
+    const cart = await Cart.findOne({ user: req.user.id });
+
+    // --- DEĞİŞTİRİLMESİ GEREKEN KISIM ---
+    // Eğer sepet bulunamazsa, bu bir hata değildir. Amaç zaten sepetin boş olması.
+    if (!cart) {
+        return res.status(200).json({
+            success: true,
+            message: 'Sepet zaten boş veya bulunamadı.',
+        });
+    }
+
+    // Eğer sepet varsa, sil.
+    await cart.deleteOne();
+
+    res.status(200).json({
+        success: true,
+        message: 'Sepet başarıyla temizlendi.',
+    });
 });
