@@ -97,6 +97,8 @@ exports.createProduct = asyncHandler(async (req, res, next) => {
     req.body.user = req.user.id;
     req.body.categoryId = req.body.category; 
 
+    
+
     if (req.files && req.files.length > 0) {
         req.body.images = req.files.map(file => ({
             public_id: file.filename,

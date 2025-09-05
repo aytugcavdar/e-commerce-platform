@@ -36,21 +36,32 @@ async function indexExistingProducts() {
         }
 
         console.log(`[Search Service] ${products.length} adet mevcut ürün indekslenmek üzere hazırlanıyor...`.cyan);
-        const body = products.flatMap(doc => [
-            { index: { _index: 'products', _id: doc._id } },
-            {
-                _id: doc._id.toString(),
+         const body = products.flatMap(doc => {
+            // categoryId'nin de olduğundan emin olalım
+            const categoryObj = doc.categoryInfo ? {
+                _id: doc.categoryId,
+                name: doc.categoryInfo.name,
+                slug: doc.categoryInfo.slug,
+            } : null;
+
+            return [
+                { index: { _index: 'products', _id: doc._id } },
+                {
+                    _id: doc._id,
                     name: doc.name,
-                    images: doc.images,
-                    categoryInfo: doc.categoryInfo,
-                    price: doc.price,
-                    averageRating: doc.averageRating,
-                    stock: doc.stock,
-                   
                     description: doc.description,
-                    category: doc.categoryInfo?.name || ''
-            }
-        ]);
+                    price: doc.price,
+                    images: doc.images,
+                    attributes: doc.attributes,
+                    category: categoryObj, 
+                    categoryInfo: doc.categoryInfo, 
+                    stock: doc.stock,
+                    averageRating: doc.averageRating,
+                    createdAt: doc.createdAt,
+                    updatedAt: doc.updatedAt,
+                }
+            ];
+        });
         await client.bulk({ refresh: true, body });
         console.log(`[Search Service] ${products.length} ürün başarıyla indekslendi!`.green.bold);
     } catch (error) {
@@ -75,21 +86,34 @@ function startProductListeners() {
         connection.on('disconnect', (err) => console.error('[Search Service] RabbitMQ bağlantısı koptu!'.red, err));
 
         const upsertProduct = async (msg) => {
-            try {
-                const product = JSON.parse(msg.content.toString());
-                await client.index({
-                    index: 'products',
-                    id: product._id,
-                    body: {
-                        name: product.name,
-                        description: product.description,
-                        category: product.categoryInfo?.name || '',
-                        images: product.images,
-                        price: product.price,
-                        stock: product.stock,
-                        categoryInfo: product.categoryInfo,
-                    }
-                });
+    try {
+        const product = JSON.parse(msg.content.toString());
+
+        // DEĞİŞİKLİK BURADA BAŞLIYOR
+        const categoryObj = product.categoryInfo ? {
+            _id: product.categoryId,
+            name: product.categoryInfo.name,
+            slug: product.categoryInfo.slug,
+        } : null;
+
+        await client.index({
+            index: 'products',
+            id: product._id,
+            body: {
+              _id: product._id,
+              name: product.name,
+              description: product.description,
+              price: product.price,
+              images: product.images,
+              attributes: product.attributes,
+              category: categoryObj, 
+              categoryInfo: product.categoryInfo, 
+              stock: product.stock,
+              averageRating: product.averageRating,
+              createdAt: product.createdAt,
+              updatedAt: product.updatedAt,
+            }
+        });
                 console.log(`[Search Service] Ürün indekslendi: ${product.name}`.green);
                 msg.ack();
             } catch (error) {
