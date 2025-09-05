@@ -39,9 +39,16 @@ async function indexExistingProducts() {
         const body = products.flatMap(doc => [
             { index: { _index: 'products', _id: doc._id } },
             {
-                name: doc.name,
-                description: doc.description,
-                category: doc.categoryInfo?.name || '',
+                _id: doc._id.toString(),
+                    name: doc.name,
+                    images: doc.images,
+                    categoryInfo: doc.categoryInfo,
+                    price: doc.price,
+                    averageRating: doc.averageRating,
+                    stock: doc.stock,
+                   
+                    description: doc.description,
+                    category: doc.categoryInfo?.name || ''
             }
         ]);
         await client.bulk({ refresh: true, body });
@@ -77,6 +84,10 @@ function startProductListeners() {
                         name: product.name,
                         description: product.description,
                         category: product.categoryInfo?.name || '',
+                        images: product.images,
+                        price: product.price,
+                        stock: product.stock,
+                        categoryInfo: product.categoryInfo,
                     }
                 });
                 console.log(`[Search Service] Ürün indekslendi: ${product.name}`.green);
@@ -131,15 +142,24 @@ app.get('/', async (req, res) => {
             index: 'products',
             body: {
                 query: {
-                    multi_match: {
-                        query: q,
-                        fields: [
-                            'name^3',         
-                            'description',
-                            'category'
-                        ],
-                        fuzziness: "AUTO", 
-                        type: "best_fields"
+                    bool: {
+                        should: [
+                            {
+                                multi_match: {
+                                    query: q,
+                                    fields: ['name^4', 'category^2', 'description'],
+                                    type: 'best_fields',
+                                    fuzziness: "AUTO"
+                                }
+                            },
+                            {
+                                multi_match: {
+                                    query: q,
+                                    fields: ['name', 'category', 'description'],
+                                    type: 'phrase_prefix'
+                                }
+                            }
+                        ]
                     }
                 }
             }
