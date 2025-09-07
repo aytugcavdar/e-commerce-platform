@@ -6,6 +6,7 @@ const {
   updateProduct,
   deleteProduct,
   getProductWithCategory,
+  populateCategories
 } = require('../controllers/products');
 
 const Product = require('../models/Product');
@@ -35,5 +36,6 @@ router
   .get(getProduct)
   .put(protect, authorize('admin'), upload.array('images', 5), updateProduct)
   .delete(protect, authorize('admin'), deleteProduct);
+
 
 module.exports = router;
