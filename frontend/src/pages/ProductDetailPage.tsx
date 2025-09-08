@@ -3,7 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { useGetProductWithCategoryQuery } from '../features/products/productsApiSlice';
 import { useGetCategoryWithAncestorsQuery } from '../features/categories/categoryApiSlice';
 import { ChevronRight, Star, ShoppingCart, Heart, Share2 } from 'lucide-react';
-
+import { useAddToCartMutation } from '../features/cart/cartApiSlice';
+import { useNotify } from '../hooks/useNotify';
 interface Breadcrumb {
   name: string;
   slug?: string;

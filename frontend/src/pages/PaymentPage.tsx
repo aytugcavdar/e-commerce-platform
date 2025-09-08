@@ -1,4 +1,3 @@
-// frontend/src/pages/PaymentPage.tsx
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGetOrderByIdQuery } from '../features/orders/orderApiSlice';
