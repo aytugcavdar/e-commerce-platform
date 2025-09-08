@@ -8,6 +8,11 @@ interface ApiResponse<T> {
   data: T;
 }
 
+// Ancestors ile birlikte category tipi
+interface CategoryWithAncestors extends Category {
+  ancestors: Category[];
+}
+
 export const categoryApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // GET ALL CATEGORIES - DÜZELTİLDİ
@@ -30,6 +35,16 @@ export const categoryApiSlice = apiSlice.injectEndpoints({
             { type: 'Category', id: arg },
             ...result.map(({ _id }) => ({ type: 'Category' as const, id: _id })),
         ]
+    }),
+
+    // GET CATEGORY WITH ANCESTORS - YENİ
+    getCategoryWithAncestors: builder.query<CategoryWithAncestors, string>({
+      query: (id) => `/categories/${id}/with-ancestors`,
+      transformResponse: (res: ApiResponse<CategoryWithAncestors>) => res.data,
+      providesTags: (result, _error, arg) => [
+        { type: 'Category', id: arg },
+        { type: 'Category', id: 'ANCESTORS' }
+      ],
     }),
 
     // ADD CATEGORY
@@ -66,6 +81,7 @@ export const categoryApiSlice = apiSlice.injectEndpoints({
 export const {
   useGetCategoriesQuery,
   useGetSubCategoriesQuery,
+  useGetCategoryWithAncestorsQuery,
   useAddCategoryMutation,
   useUpdateCategoryMutation,
   useDeleteCategoryMutation,

@@ -49,11 +49,14 @@ export const usersApiSlice = apiSlice.injectEndpoints({
             }),
             invalidatesTags: [{ type: 'User', id: 'ME' }],
         }),
+        getUserById: builder.query<ApiResponse<User>, string>({
+            query: (id) => `/users/${id}`,
+            providesTags: (result, error, id) => [{ type: 'User', id }],
+        }),
     })
     
 });
-console.log('usersApiSlice loaded');
-console.log(usersApiSlice.endpoints.getUsers);
 
 
-export const { useGetUsersQuery, useUpdateUserMutation, useAddAddressMutation, useUpdateAddressMutation, useDeleteAddressMutation, useSetDefaultAddressMutation } = usersApiSlice;
+
+export const { useGetUsersQuery, useUpdateUserMutation, useAddAddressMutation, useUpdateAddressMutation, useDeleteAddressMutation, useSetDefaultAddressMutation, useGetUserByIdQuery } = usersApiSlice;

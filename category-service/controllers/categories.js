@@ -251,10 +251,11 @@ exports.getCategoryStats = asyncHandler(async (req, res, next) => {
     });
 });
 // @desc      Get single category with its ancestors
-// @route     GET /api/v1/categories/:id/with-ancestors
+// @route     GET /api/categories/:id/with-ancestors
 // @access    Public
 exports.getCategoryWithAncestors = asyncHandler(async (req, res, next) => {
-  const category = await Category.findById(req.params.id).populate('ancestors');
+  const category = await Category.findById(req.params.id)
+    .populate('parent', 'name slug');
 
   if (!category) {
     return next(
@@ -262,5 +263,37 @@ exports.getCategoryWithAncestors = asyncHandler(async (req, res, next) => {
     );
   }
 
-  res.status(200).json({ success: true, data: category });
+  // Ancestors array'i oluştur
+  const ancestors = [];
+  let currentCategory = category;
+
+  // Parent'ları takip ederek tüm ancestors'ı topla
+  while (currentCategory && currentCategory.parent) {
+    try {
+      const parentCategory = await Category.findById(currentCategory.parent._id || currentCategory.parent)
+        .populate('parent', 'name slug');
+      
+      if (parentCategory) {
+        ancestors.unshift({
+          _id: parentCategory._id,
+          name: parentCategory.name,
+          slug: parentCategory.slug
+        });
+        currentCategory = parentCategory;
+      } else {
+        break;
+      }
+    } catch (error) {
+      console.error('Error fetching parent category:', error);
+      break;
+    }
+  }
+
+  // Sonucu döndür
+  const result = {
+    ...category.toObject(),
+    ancestors: ancestors
+  };
+
+  res.status(200).json({ success: true, data: result });
 });
