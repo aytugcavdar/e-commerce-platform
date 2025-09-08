@@ -10,8 +10,13 @@ interface Breadcrumb {
   _id?: string;
 }
 
+
+
+
 const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+   const notify = useNotify();
+  const [addToCart, { isLoading: isAddingToCart }] = useAddToCartMutation();
   
   const {
     data: productResponse,
@@ -19,6 +24,16 @@ const ProductDetailPage: React.FC = () => {
     error: productError
   } = useGetProductWithCategoryQuery(id!);
 
+  const handleAddToCart = async () => { // Eklendi
+    if (!product) return;
+    try {
+      await addToCart({ productId: product._id, quantity: 1 }).unwrap();
+      notify.success('Ürün sepete eklendi!');
+    } catch (err) {
+      notify.error('Ürün sepete eklenemedi!');
+      console.error('Sepete eklenemedi:', err);
+    }
+  };
   const product = productResponse?.data;
 
   // Eğer ürün bilgisi geldi ve categoryId varsa, category ancestors'ları al
@@ -236,12 +251,13 @@ const ProductDetailPage: React.FC = () => {
 
               {/* Aksiyon Butonları */}
               <div className="space-y-4">
-                <button
-                  disabled={!product.stock || product.stock === 0}
+                 <button
+                  onClick={handleAddToCart} // Eklendi
+                  disabled={!product.stock || product.stock === 0 || isAddingToCart} // isAddingToCart eklendi
                   className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   <ShoppingCart className="w-5 h-5" />
-                  <span>Sepete Ekle</span>
+                  <span>{isAddingToCart ? 'Ekleniyor...' : 'Sepete Ekle'}</span> {/* Yüklenme durumu eklendi */}
                 </button>
 
                 <div className="flex space-x-4">

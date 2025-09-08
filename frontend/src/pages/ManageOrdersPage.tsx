@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useGetOrdersQuery, useUpdateOrderStatusMutation } from '../features/orders/ordersApiSlice';
+import { useGetOrdersQuery, useUpdateOrderStatusMutation } from '../features/orders/orderApiSlice';
 import { useGetUserByIdQuery } from '../features/users/usersApiSlice';
 import { Eye, Edit, Package, Truck, CheckCircle, XCircle, Clock, User } from 'lucide-react';
 
