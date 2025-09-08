@@ -1,53 +1,38 @@
-// src/types/User.ts
+export interface Address {
+    _id: string;
+    name: string;
+    street: string;
+    city: string;
+    zipCode: string;
+    isDefault: boolean;
+}
 
 export interface User {
   id: string;
-  _id?: string; // MongoDB ID'si
+  username: string;
+  email: string;
   firstName: string;
   lastName: string;
-  email: string;
-  role: 'admin' | 'user';
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-  phone?: string;
+  fullName: string;
   addresses?: Address[];
   avatar?: {
-    public_id: string;
-    url: string;
+    public_id: string | null;
+    url: string | null;
   };
-}
-
-export interface Address {
-  _id: string;
-  title: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  street: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  country: string;
-  isDefault: boolean;
+  role: 'user' | 'admin';
+  emailVerified: boolean;
+  lastLogin?: string;
   createdAt: string;
 }
 
-
-export interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-  count?: number;
-  total?: number;
-  pagination?: {
-    next?: {
-      page: number;
-      limit: number;
-    };
-    prev?: {
-      page: number;
-      limit: number;
-    };
-  };
+export interface AuthState {
+    user: User | null;
+    token: string | null;
 }
+
+export type ProfileUpdateFormData = {
+  firstName: string;
+  lastName: string;
+  username: string;
+  avatar?: FileList;
+};

@@ -1,7 +1,7 @@
 // frontend/src/pages/PaymentPage.tsx
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useGetOrderQuery } from '../features/orders/orderApiSlice';
+import { useGetOrderByIdQuery } from '../features/orders/orderApiSlice';
 import { useProcessPaymentMutation } from '../features/payment/paymentApiSlice';
 import { useNotify } from '../hooks/useNotify';
 const PaymentPage: React.FC = () => {
@@ -9,7 +9,7 @@ const PaymentPage: React.FC = () => {
     const navigate = useNavigate();
     const notify = useNotify();
     // Sipariş detaylarını al
-    const { data: orderData, isLoading: isLoadingOrder, isError } = useGetOrderQuery(orderId!);
+    const { data: orderData, isLoading: isLoadingOrder, isError } = useGetOrderByIdQuery(orderId!);
     // Ödeme işlemini tetikleyecek mutation
     const [processPayment, { isLoading: isProcessingPayment }] = useProcessPaymentMutation();
 
