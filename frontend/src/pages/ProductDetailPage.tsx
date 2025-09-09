@@ -135,7 +135,7 @@ const ProductDetailPage: React.FC = () => {
                   </span>
                 ) : crumb.slug ? (
                   <Link 
-                    to={`/categories/${crumb.slug}`}
+                    to={`/categories/${crumb._id}`}
                     className="text-blue-600 hover:text-blue-800 font-medium"
                   >
                     {crumb.name}

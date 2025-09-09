@@ -10,6 +10,7 @@ import CheckoutPage from './pages/CheckoutPage';
 import ProfilePage from './pages/ProfilePage';
 import CategoryAdminPage from './pages/CategoryAdminPage';
 import PersistLogin from './features/auth/PersistLogin';
+import CategoryPage from './pages/CategoryPage';
 import './App.css';
 import { ToastContainer } from 'react-toastify';
 
@@ -45,6 +46,7 @@ function App() {
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/cart" element={<CartPage />} />
               <Route path="/products/:id" element={<ProductDetailPage />} />
+               <Route path="/categories/:categoryId" element={<CategoryPage />} />
               <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/payment/:orderId" element={<PaymentPage />} />
               <Route path="/profile/orders/:orderId" element={<OrderDetailPage />} />
