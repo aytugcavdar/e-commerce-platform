@@ -75,6 +75,10 @@ export const categoryApiSlice = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, arg) => [{ type: 'Category', id: arg }],
     }),
+    getCategory: builder.query<ApiResponse<Category>, string>({
+        query: (id) => `/categories/${id}`,
+        providesTags: (result, error, id) => [{ type: 'Category', id }],
+    }),
   }),
 });
 
@@ -85,4 +89,5 @@ export const {
   useAddCategoryMutation,
   useUpdateCategoryMutation,
   useDeleteCategoryMutation,
+  useGetCategoryQuery,
 } = categoryApiSlice;
