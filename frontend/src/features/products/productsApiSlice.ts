@@ -58,10 +58,23 @@ export const productsApiSlice = apiSlice.injectEndpoints({
                 : [{ type: 'Product', id: 'SEARCH' }],
         }),
         getProductsByCategory: builder.query<ApiResponse<Product[]>, string[]>({
-            query: (categoryIds) => `/products?categoryId[in]=${categoryIds.join(',')}`,
-            providesTags: (result, error, categoryIds) =>
-                result ? [{ type: 'Product', id: 'LIST' }] : [],
-        }),
+    query: (categoryIds) => {
+        console.log('🔍 Frontend - API çağrısı yapılıyor:', categoryIds);
+        
+        if (!categoryIds || categoryIds.length === 0) {
+            throw new Error('Kategori ID\'leri boş');
+        }
+        
+        // Doğru endpoint yapısı
+        const endpoint = `/products/category/${categoryIds.join(',')}`;
+        console.log('🌐 API Endpoint:', endpoint);
+        
+        return endpoint;
+    },
+    // Response'u olduğu gibi döndür (data field'ı ile)
+    providesTags: (result, error, categoryIds) =>
+        result ? [{ type: 'Product', id: 'CATEGORY_LIST' }] : [],
+}),
     })
 });
 

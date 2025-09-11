@@ -6,7 +6,7 @@ const {
   updateProduct,
   deleteProduct,
   getProductWithCategory,
-  populateCategories
+  getProductsByCategory // YENİ: Bu fonksiyonu ekleyeceğiz
 } = require('../controllers/products');
 
 const Product = require('../models/Product');
@@ -17,13 +17,18 @@ const upload = require('../middleware/upload');
 const router = express.Router();
 
 // ÖNEMLİ: Bu sıralama çok kritik!
-// Daha spesifik rotalar (:id/with-category gibi) önce gelmelidir
+// Daha spesifik rotalar önce gelmelidir
 
 // Genel route'lar
 router
   .route('/')
   .get(advancedResults(Product), getProducts)
   .post(protect, authorize('admin'), upload.array('images', 5), createProduct);
+
+// YENİ: Kategoriye göre ürünleri getir - EN ÖNCE
+router
+  .route('/category/:categoryIds')
+  .get(getProductsByCategory);
 
 // ÖNEMLİ: Bu route mutlaka /:id route'undan ÖNCE tanımlanmalı!
 router
@@ -36,6 +41,5 @@ router
   .get(getProduct)
   .put(protect, authorize('admin'), upload.array('images', 5), updateProduct)
   .delete(protect, authorize('admin'), deleteProduct);
-
 
 module.exports = router;

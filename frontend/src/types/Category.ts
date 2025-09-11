@@ -4,7 +4,7 @@ export interface Category {
   slug: string;
   description?: string;
   parent?: string | null;
-  category?: Category;
+  children?: Category[];
   user: string;
   createdAt: string;
   updatedAt: string;

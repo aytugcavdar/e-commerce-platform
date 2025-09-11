@@ -209,3 +209,50 @@ exports.updateStock = asyncHandler(async (req, res, next) => {
         message: `${items.length} ürünün stoğu başarıyla güncellendi.`
     });
 });
+// @desc    Kategoriye göre ürünleri getir
+// @route   GET /api/products/category/:categoryIds
+// @access  Public
+exports.getProductsByCategory = asyncHandler(async (req, res, next) => {
+    console.log(`🔍 Kategoriye göre ürünler aranıyor - Tüm params:`, req.params);
+    console.log(`🔍 categoryIds parametresi:`, req.params.categoryIds);
+    
+    // Güvenli parametre kontrolü
+    const categoryIdsParam = req.params.categoryIds;
+    
+    if (!categoryIdsParam) {
+        console.log('❌ categoryIds parametresi boş');
+        return next(new ErrorResponse('Kategori ID\'si belirtilmelidir', 400));
+    }
+    
+    // categoryIds parametresini virgülle ayrılmış string olarak al ve temizle
+    const categoryIds = categoryIdsParam
+        .split(',')
+        .map(id => id.trim())
+        .filter(id => id.length > 0);
+    
+    if (categoryIds.length === 0) {
+        console.log('❌ Geçerli kategori ID\'si yok');
+        return next(new ErrorResponse('Geçerli kategori ID\'si belirtilmelidir', 400));
+    }
+    
+    console.log(`📋 Aranan kategori ID'leri:`, categoryIds);
+    
+    try {
+        // Kategorilere ait ürünleri bul
+        const products = await Product.find({ 
+            categoryId: { $in: categoryIds },
+            status: 'active' // Sadece aktif ürünleri getir
+        }).sort({ createdAt: -1 });
+        
+        console.log(`✅ ${products.length} adet ürün bulundu`);
+        
+        res.status(200).json({
+            success: true,
+            count: products.length,
+            data: products
+        });
+    } catch (error) {
+        console.error('❌ Veritabanı sorgu hatası:', error);
+        return next(new ErrorResponse('Ürünler getirilirken hata oluştu', 500));
+    }
+});
