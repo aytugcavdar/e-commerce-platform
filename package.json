@@ -1,0 +1,29 @@
+{
+  "name": "ecommerce-platform",
+  "version": "1.0.0",
+  "description": "E-Commerce Microservices Platform",
+  "private": true,
+  "workspaces": [
+    "services/*",
+    "shared-utils",
+    "gateway",
+    "frontend",
+    "admin-dashboard"
+  ],
+  "scripts": {
+    "start": "docker-compose up -d",
+    "start:dev": "docker-compose up --build",
+    "stop": "docker-compose down",
+    "restart": "npm run stop && npm run start",
+    "logs": "docker-compose logs -f",
+    "install:all": "npm install",
+    "env:setup": "cp .env.example .env"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}

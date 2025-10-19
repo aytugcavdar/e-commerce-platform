@@ -1,0 +1,220 @@
+version: '3.8'
+
+services:
+  # 🗄️ MongoDB
+  mongo:
+    image: mongo:7.0
+    container_name: ecommerce-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - ecommerce-network
+
+  # 🐰 RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: ecommerce-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - ecommerce-network
+
+  # 🚪 API Gateway
+  gateway:
+    build:
+      context: .
+      dockerfile: ./gateway/Dockerfile
+    container_name: ecommerce-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      USER_SERVICE_URL: http://user-service:5001
+      PRODUCT_SERVICE_URL: http://product-service:5002
+      ORDER_SERVICE_URL: http://order-service:5003
+      PAYMENT_SERVICE_URL: http://payment-service:5004
+      INVENTORY_SERVICE_URL: http://inventory-service:5005
+      SHIPPING_SERVICE_URL: http://shipping-service:5006
+      NODE_ENV: ${NODE_ENV:-development}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - inventory-service
+      - shipping-service
+    networks:
+      - ecommerce-network
+
+  # 👤 User Service
+  user-service:
+    build:
+      context: .
+      dockerfile: ./services/user-service/Dockerfile
+    container_name: ecommerce-user-service
+    restart: unless-stopped
+    expose:
+      - "5001"
+    environment:
+      MONGODB_URI: ${MONGODB_URI_USER}
+      PORT: 5001
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE: ${JWT_EXPIRE}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT}
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+      EMAIL_FROM: ${EMAIL_FROM}
+    depends_on:
+      - mongo
+      - rabbitmq
+    networks:
+      - ecommerce-network
+
+  # 📦 Product Service
+  product-service:
+    build:
+      context: .
+      dockerfile: ./services/product-service/Dockerfile
+    container_name: ecommerce-product-service
+    restart: unless-stopped
+    expose:
+      - "5002"
+    environment:
+      MONGODB_URI: ${MONGODB_URI_PRODUCT}
+      PORT: 5002
+      JWT_SECRET: ${JWT_SECRET}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+    depends_on:
+      - mongo
+      - rabbitmq
+    networks:
+      - ecommerce-network
+
+  # 🛒 Order Service
+  order-service:
+    build:
+      context: .
+      dockerfile: ./services/order-service/Dockerfile
+    container_name: ecommerce-order-service
+    restart: unless-stopped
+    expose:
+      - "5003"
+    environment:
+      MONGODB_URI: ${MONGODB_URI_ORDER}
+      PORT: 5003
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+      INVENTORY_SERVICE_URL: http://inventory-service:5005
+      PRODUCT_SERVICE_URL: http://product-service:5002
+    depends_on:
+      - mongo
+      - rabbitmq
+      - inventory-service
+      - product-service
+    networks:
+      - ecommerce-network
+
+  # 💳 Payment Service
+  payment-service:
+    build:
+      context: .
+      dockerfile: ./services/payment-service/Dockerfile
+    container_name: ecommerce-payment-service
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: ${MONGODB_URI_PAYMENT}
+      RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+    depends_on:
+      - mongo
+      - rabbitmq
+    networks:
+      - ecommerce-network
+
+  # 📊 Inventory Service
+  inventory-service:
+    build:
+      context: .
+      dockerfile: ./services/inventory-service/Dockerfile
+    container_name: ecommerce-inventory-service
+    restart: unless-stopped
+    expose:
+      - "5005"
+    environment:
+      MONGODB_URI: ${MONGODB_URI_INVENTORY}
+      PORT: 5005
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+    depends_on:
+      - mongo
+      - rabbitmq
+    networks:
+      - ecommerce-network
+
+  # 🚚 Shipping Service
+  shipping-service:
+    build:
+      context: .
+      dockerfile: ./services/shipping-service/Dockerfile
+    container_name: ecommerce-shipping-service
+    restart: unless-stopped
+    expose:
+      - "5006"
+    environment:
+      MONGODB_URI: ${MONGODB_URI_SHIPPING}
+      PORT: 5006
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+    depends_on:
+      - mongo
+      - rabbitmq
+    networks:
+      - ecommerce-network
+
+  # 📧 Notification Service
+  notification-service:
+    build:
+      context: .
+      dockerfile: ./services/notification-service/Dockerfile
+    container_name: ecommerce-notification-service
+    restart: unless-stopped
+    environment:
+      RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT}
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+      EMAIL_FROM: ${EMAIL_FROM}
+    depends_on:
+      - rabbitmq
+    networks:
+      - ecommerce-network
+
+volumes:
+  mongo_data:
+  rabbitmq_data:
+
+networks:
+  ecommerce-network:
+    driver: bridge
