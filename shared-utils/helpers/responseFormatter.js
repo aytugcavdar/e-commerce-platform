@@ -1,4 +1,4 @@
-const {httpStatus} = require('../constants/httpStatus');
+const {httpStatus} = require('../constants');
 
 class ResponseFormatter {
     static success(data = null,message = 'Success', statusCode = httpStatus.OK) {

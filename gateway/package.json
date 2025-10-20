@@ -4,13 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "start": "node server.js",
+  "dev": "nodemon server.js"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@rent-a-car/shared-utils": "*",
+    "@ecommerce/shared-utils": "*",
     "axios": "^1.12.2",
     "compression": "^1.8.1",
     "cors": "^2.8.5",

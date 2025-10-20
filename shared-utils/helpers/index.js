@@ -3,4 +3,5 @@ module.exports = {
   PasswordUtils: require('./passwordUtils'),
   CloudinaryHelper: require('./cloudinaryHelper'),
   EmailHelper: require('./emailHelper'),
+  TokenHelper: require('./tokenHelper')
 };

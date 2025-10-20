@@ -12,7 +12,7 @@ const {
   middleware: { ErrorHandler },
   helpers: { ResponseFormatter },
   constants: { httpStatus }
-} = require('@rent-a-car/shared-utils');
+} = require('@ecommerce/shared-utils');
 
 const app = express();
 
