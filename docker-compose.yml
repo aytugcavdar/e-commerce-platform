@@ -1,21 +1,6 @@
 version: '3.8'
 
 services:
-  # 🗄️ MongoDB
-  mongo:
-    image: mongo:7.0
-    container_name: ecommerce-mongo
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin123
-    volumes:
-      - mongo_data:/data/db
-    networks:
-      - ecommerce-network
-
   # 🐰 RabbitMQ
   rabbitmq:
     image: rabbitmq:3.12-management
