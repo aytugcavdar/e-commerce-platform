@@ -69,9 +69,7 @@ class UserValidators {
       }),
     });
   }
-  // TODO: İleride e-posta doğrulama, şifre sıfırlama, profil güncelleme gibi
-  // işlemler için de buraya yeni şemalar eklenecek.
-  // Örnek: static updateProfileSchema = Joi.object({ ... });
+  
 }
 
 module.exports = UserValidators;

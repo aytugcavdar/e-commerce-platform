@@ -4,7 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const {createProxyMiddleware} = require('http-proxy-middleware');
-const ratelimit = require('express-rate-limit');
+const rateLimit = require('express-rate-limit');
 const axios = require('axios');
 
 const {
