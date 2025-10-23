@@ -55,6 +55,7 @@ const userSchema = new mongoose.Schema(
     defaultAddress: mongoose.Schema.Types.ObjectId,
 
     // Security
+    isEmailVerified: { type: Boolean, default: false },
     emailVerificationToken: String,
     emailVerificationExpires: Date,
     passwordResetToken: String,
@@ -94,7 +95,6 @@ userSchema.virtual('isLocked').get(function () {
 });
 
 // 🔹 Indexes
-userSchema.index({ email: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1, isBlocked: 1 });
 userSchema.index({ createdAt: -1 });

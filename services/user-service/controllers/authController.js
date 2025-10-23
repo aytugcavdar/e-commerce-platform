@@ -307,6 +307,38 @@ class AuthController {
       ResponseFormatter.success(null, 'Şifreniz başarıyla sıfırlandı! Şimdi giriş yapabilirsiniz.')
     );
   });
-}
+  
+static refreshToken = asyncHandler(async (req, res) => {
+    const refreshToken = CookieHelper.getRefreshTokenFromRequest(req);
 
+    if (!refreshToken) {
+      return res.status(httpStatus.UNAUTHORIZED).json(
+        ResponseFormatter.error('Refresh token bulunamadı', httpStatus.UNAUTHORIZED)
+      );
+    }
+
+    // Refresh token'ı doğrula
+    const decoded = TokenHelper.verifyToken(refreshToken);
+    
+    if (!decoded || decoded.type !== 'refresh') {
+      return res.status(httpStatus.UNAUTHORIZED).json(
+        ResponseFormatter.error('Geçersiz refresh token', httpStatus.UNAUTHORIZED)
+      );
+    }
+
+    // Kullanıcıyı bul
+    const user = await User.findById(decoded.userId);
+    
+    if (!user || !user.isActive) {
+      return res.status(httpStatus.UNAUTHORIZED).json(
+        ResponseFormatter.error('Kullanıcı bulunamadı veya aktif değil', httpStatus.UNAUTHORIZED)
+      );
+    }
+
+    logger.info(`Token yenilendi: ${user.email}`);
+
+    // Yeni tokenlar oluştur ve gönder
+    CookieHelper.sendTokensResponse(res, user, ResponseFormatter);
+  });
+}
 module.exports = AuthController;

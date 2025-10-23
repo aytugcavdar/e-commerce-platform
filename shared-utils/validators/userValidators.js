@@ -69,6 +69,59 @@ class UserValidators {
       }),
     });
   }
+  static verifyEmailSchema() {
+    return Joi.object({
+      token: Joi.string().required().messages({
+        "string.base": "Token metin formatında olmalıdır.",
+        "string.empty": "Token alanı boş bırakılamaz.",
+        "any.required": "Token alanı zorunludur.",
+      }),
+    });
+  }
+  static forgotPasswordSchema() {
+    return Joi.object({
+      email: Joi.string().trim().email().lowercase().required().messages({
+        "string.email": "Geçerli bir email adresi girin.",
+        "any.required": "Email alanı zorunludur.",
+      }),
+    });
+  }
+  static resendVerificationEmailSchema() {
+    return Joi.object({
+      email: Joi.string().trim().email().lowercase().required().messages({
+        "string.email": "Geçerli bir email adresi girin.",
+        "any.required": "Email alanı zorunludur.",
+      }),
+    });
+  }
+  
+
+  static resetPasswordTokenSchema() {
+    return Joi.object({
+      token: Joi.string().hex().length(64).required().messages({
+         'string.hex': 'Geçersiz token formatı.',
+         'string.length': 'Token uzunluğu geçersiz.',
+         'any.required': 'Sıfırlama tokeni gereklidir.',
+      }),
+    });
+  }
+
+  // Reset Password Body: Sadece yeni şifre (body'de bekleniyor) - Mevcut şemayı güncelleyelim ✅
+  static resetPasswordSchema() {
+    return Joi.object({
+      // email ve token BURADA OLMAMALI, query'den geliyorlar.
+      password: Joi.string()
+        .min(8) // Yeni şifre de kurallara uymalı (Model ile tutarlı: min 8)
+        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/) // Yeni şifre de kurallara uymalı (Model ile tutarlı: Özel karakter yok)
+        .required()
+        .messages({
+          'string.min': 'Yeni şifre en az 8 karakter olmalıdır.',
+          'string.pattern.base': 'Yeni şifre en az bir küçük harf, bir büyük harf ve bir rakam içermelidir.',
+          'any.required': 'Yeni şifre alanı zorunludur.',
+        }),
+    });
+  }
+
   
 }
 
