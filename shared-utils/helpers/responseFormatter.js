@@ -29,3 +29,4 @@ class ResponseFormatter {
     
 
 }
+module.exports = ResponseFormatter;

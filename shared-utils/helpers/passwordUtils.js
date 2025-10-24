@@ -10,3 +10,4 @@ class PasswordUtils {
     return await bcrypt.compare(plainPassword, hashedPassword);
   }
 }
+module.exports = PasswordUtils;

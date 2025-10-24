@@ -20,6 +20,7 @@ CloudinaryHelper.init();
 app.use(cors());
 app.use(express.json());
 
+// Auth Routes
 app.use('/api/auth', authRoutes);
 
 // Hata yakalama middleware'i

@@ -58,7 +58,7 @@ app.get('/health', (req, res) => {
 
 app.get('/status', async (req, res) => {
   const services = {
-    'auth-service': process.env.AUTH_SERVICE_URL || 'http://rentacar-auth-service:5001',
+    'auth-service': process.env.AUTH_SERVICE_URL || 'http://E-commerce-auth-service:5001',
     // Diğer servisler buraya eklenecek
   };
 
