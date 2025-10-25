@@ -43,7 +43,7 @@ const uploadFromBuffer = (fileBuffer, folderName) => {
   });
 };
 
-// ✅ YENİ METODLAR
+
 const deleteFile = async (publicId) => {
   if (!isConfigured) {
     throw new Error('Cloudinary not initialized');

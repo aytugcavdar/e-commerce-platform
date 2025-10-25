@@ -125,7 +125,7 @@ productSchema.virtual("discountPercentage").get(function () {
   return Math.round(((this.price - this.discountPrice) / this.price) * 100);
 });
 
-roductSchema.virtual("isInStock").get(function () {
+productSchema.virtual("isInStock").get(function () {
   return this.stock > 0;
 });
 
