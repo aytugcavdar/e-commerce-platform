@@ -43,6 +43,7 @@ const shippingAddressSchema = Joi.object({
   country: Joi.string().default('Turkey'),
 });
 
+
 class OrderValidators {
   /**
    * Create Order Schema

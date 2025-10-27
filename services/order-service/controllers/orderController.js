@@ -14,169 +14,158 @@ class OrderController {
    * @route POST /api/orders
    * @access Private
    */
-  static createOrder = asyncHandler(async (req, res) => {
-    const {
-      items,
-      shippingAddress,
-      billingAddress,
-      paymentMethod,
-      notes,
-      coupon
-    } = req.body;
+  static createOrder = asyncHandler(async (req, res, next) => {
+  const {
+    items,
+    shippingAddress,
+    billingAddress,
+    paymentMethod,
+    notes,
+    couponCode
+  } = req.body;
 
-    const userId = req.user.userId;
+  const userId = req.user.userId;
 
-    // Validate items exist and get product details
-    if (!items || items.length === 0) {
-      return res.status(httpStatus.BAD_REQUEST).json(
-        ResponseFormatter.error(errorMessages.EMPTY_CART, httpStatus.BAD_REQUEST)
-      );
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(httpStatus.BAD_REQUEST).json(
+      ResponseFormatter.error(errorMessages.EMPTY_CART || 'Sepet boş olamaz', httpStatus.BAD_REQUEST)
+    );
+  }
+
+  let enrichedItems = [];
+  let subtotal = 0;
+
+  // 1️⃣ Product Service — Ürünleri doğrula ve fiyatları güncel al
+  try {
+    const productIds = items.map(item => item.product);
+    logger.info(`[OrderService] Fetching products: ${productIds}`);
+
+    const productResponse = await axios.post(
+      `${process.env.PRODUCT_SERVICE_URL}/api/products/products/bulk`,
+      { ids: productIds }
+    );
+
+    if (!productResponse.data?.success) {
+      throw new Error('Product service success = false');
     }
 
-    // Check stock availability with Inventory Service
-    try {
-      const inventoryResponse = await axios.post(
-        `${process.env.INVENTORY_SERVICE_URL}/api/inventory/check-bulk`,
-        { items: items.map(item => ({ 
-          productId: item.product, 
-          quantity: item.quantity 
-        })) }
-      );
+    const products = productResponse.data.data;
 
-      if (!inventoryResponse.data.success) {
-        return res.status(httpStatus.BAD_REQUEST).json(
-          ResponseFormatter.error(errorMessages.INSUFFICIENT_STOCK, httpStatus.BAD_REQUEST)
-        );
-      }
-    } catch (error) {
-      logger.error('Inventory check failed:', error);
-      return res.status(httpStatus.SERVICE_UNAVAILABLE).json(
-        ResponseFormatter.error(errorMessages.SERVICE_UNAVAILABLE, httpStatus.SERVICE_UNAVAILABLE)
-      );
-    }
+    enrichedItems = items.map(item => {
+      const product = products.find(p => p._id.toString() === item.product.toString());
+      if (!product) throw new Error(`Product not found: ${item.product}`);
 
-    // Get product details from Product Service
-    let enrichedItems = [];
-    try {
-      const productIds = items.map(item => item.product);
-      const productResponse = await axios.post(
-        `${process.env.PRODUCT_SERVICE_URL}/api/products/bulk`,
-        { ids: productIds }
-      );
+      const currentPrice = product.discountPrice ?? product.price;
+      subtotal += currentPrice * item.quantity;
 
-      const products = productResponse.data.data;
-      
-      enrichedItems = items.map(item => {
-        const product = products.find(p => p._id.toString() === item.product.toString());
-        
-        if (!product) {
-          throw new Error(`Product ${item.product} not found`);
-        }
-
-        return {
-          product: product._id,
-          name: product.name,
-          quantity: item.quantity,
-          price: product.price,
-          discountPrice: product.discountPrice,
-          image: product.images?.[0]?.url || '',
-          brand: product.brand?.name || '',
-          category: product.category?.name || ''
-        };
-      });
-    } catch (error) {
-      logger.error('Product fetch failed:', error);
-      return res.status(httpStatus.BAD_REQUEST).json(
-        ResponseFormatter.error(errorMessages.PRODUCT_NOT_FOUND, httpStatus.BAD_REQUEST)
-      );
-    }
-
-    // Calculate totals
-    const subtotal = enrichedItems.reduce((sum, item) => {
-      const itemPrice = item.discountPrice || item.price;
-      return sum + (itemPrice * item.quantity);
-    }, 0);
-
-    let discount = 0;
-    if (coupon) {
-      // TODO: Validate coupon with Coupon Service
-      discount = coupon.discount || 0;
-    }
-
-    const tax = subtotal * 0.18; // 18% KDV
-    const shippingCost = subtotal > 200 ? 0 : 29.90; // Free shipping over 200 TL
-    const total = subtotal + tax + shippingCost - discount;
-
-    // Create order
-    const order = new Order({
-      user: userId,
-      items: enrichedItems,
-      subtotal,
-      tax,
-      shippingCost,
-      discount,
-      total,
-      shippingAddress,
-      billingAddress: billingAddress || shippingAddress,
-      paymentMethod,
-      notes,
-      coupon,
-      status: 'pending',
-      paymentStatus: 'pending'
+      return {
+        product: product._id,
+        name: product.name,
+        quantity: item.quantity,
+        price: product.price,
+        discountPrice: product.discountPrice,
+        image: product.images?.[0]?.url || '',
+      };
     });
 
-    try {
-      await order.save();
+  } catch (error) {
+    logger.error('Product validation failed:', error);
+    return next(new Error(errorMessages.PRODUCT_NOT_FOUND));
+  }
 
-      // Reserve inventory
-      try {
-        await axios.post(
-          `${process.env.INVENTORY_SERVICE_URL}/api/inventory/reserve`,
-          { 
-            orderId: order._id,
-            items: items.map(item => ({ 
-              productId: item.product, 
-              quantity: item.quantity 
-            }))
-          }
-        );
-      } catch (error) {
-        logger.error('Inventory reservation failed:', error);
-        // Rollback order
-        await order.deleteOne();
-        return res.status(httpStatus.INTERNAL_SERVER_ERROR).json(
-          ResponseFormatter.error('Stok rezervasyonu başarısız', httpStatus.INTERNAL_SERVER_ERROR)
-        );
-      }
+  // 2️⃣ STOk Kontrolü
+  try {
+    const checkStockResponse = await axios.post(
+      `${process.env.PRODUCT_SERVICE_URL}/api/products/products/check-stock`,
+      { items: items.map(i => ({ productId: i.product, quantity: i.quantity })) }
+    );
 
-      // Publish order created event
-      try {
-        await publisher.publish('order.created', {
-          orderId: order._id,
-          userId: order.user,
-          total: order.total,
-          items: order.items.map(item => ({
-            productId: item.product,
-            quantity: item.quantity
-          }))
-        });
-      } catch (error) {
-        logger.warn('Failed to publish order.created event:', error);
-      }
-
-      // Populate order
-      await order.populate('user', 'firstName lastName email');
-
-      res.status(httpStatus.CREATED).json(
-        ResponseFormatter.success(order, 'Sipariş başarıyla oluşturuldu')
-      );
-    } catch (error) {
-      logger.error('Order creation failed:', error);
-      return res.status(httpStatus.INTERNAL_SERVER_ERROR).json(
-        ResponseFormatter.error(errorMessages.DATABASE_ERROR, httpStatus.INTERNAL_SERVER_ERROR)
+    if (!checkStockResponse.data?.data?.allAvailable) {
+      return res.status(httpStatus.BAD_REQUEST).json(
+        ResponseFormatter.error(errorMessages.INSUFFICIENT_STOCK, httpStatus.BAD_REQUEST)
       );
     }
+  } catch (error) {
+    logger.error('Stock check failed:', error);
+    return next(new Error(errorMessages.SERVICE_UNAVAILABLE + ' (Product Stock Check)'));
+  }
+
+  // 3️⃣ Toplam Hesapları
+  let discountAmount = 0;
+  let couponData = null;
+
+  if (couponCode) {
+    logger.warn(`Coupon validation TODO -> code: ${couponCode}`);
+  }
+
+  const tax = subtotal * 0.18;
+  const shippingCost = subtotal >= 200 ? 0 : 29.90;
+  const total = subtotal + tax + shippingCost - discountAmount;
+
+  // 4️⃣ Siparişi DB’ye Kaydet
+  const order = new Order({
+    user: userId,
+    items: enrichedItems,
+    subtotal,
+    tax,
+    shippingCost,
+    discount: discountAmount,
+    total,
+    shippingAddress,
+    billingAddress: billingAddress || shippingAddress,
+    paymentMethod,
+    notes,
+    coupon: couponData,
+    status: 'pending',
+    paymentStatus: 'pending',
+    statusHistory: [{ status: 'pending' }]
   });
+
+  try {
+    const savedOrder = await order.save();
+    logger.info(`Order created: ${savedOrder._id}`);
+
+    // Event Dispatching
+    const stockPayload = {
+      orderId: savedOrder._id,
+      items: savedOrder.items.map(i => ({ productId: i.product, quantity: i.quantity }))
+    };
+
+    await publisher.publish('product.stock.decrease', stockPayload);
+    logger.info('Event published: product.stock.decrease');
+
+    const paymentPayload = {
+      orderId: savedOrder._id,
+      userId: savedOrder.user,
+      totalAmount: savedOrder.total,
+      paymentMethod: savedOrder.paymentMethod
+    };
+
+    await publisher.publish('payment.process', paymentPayload);
+    logger.info('Event published: payment.process');
+
+    await publisher.publish('notification.order.created', {
+      orderId: savedOrder._id,
+      userEmail: req.user.email,
+      userName: req.user.firstName,
+      orderNumber: savedOrder.orderNumber,
+      total: savedOrder.total
+    });
+
+    logger.info('Event published: notification.order.created');
+
+    await savedOrder.populate('user', 'firstName lastName email');
+
+    return res
+      .status(httpStatus.CREATED)
+      .json(ResponseFormatter.success(savedOrder, 'Sipariş başarıyla oluşturuldu.'));
+
+  } catch (error) {
+    logger.error('Order database save failed:', error);
+    return next(error);
+  }
+});
+
 
   /**
    * Get user orders
@@ -298,43 +287,43 @@ class OrderController {
       );
     }
 
-    // Cancel order
-    order.status = 'cancelled';
-    order.cancellationReason = reason;
-    order.cancelledAt = new Date();
-    order.cancelledBy = userId;
+  
+    await order.updateStatus('cancelled', reason || 'Müşteri isteğiyle iptal edildi.', userId); // Model metodunu kullanalım ✅
 
-    await order.save();
-
-    // Release inventory
     try {
-      await axios.post(
-        `${process.env.INVENTORY_SERVICE_URL}/api/inventory/release`,
-        { 
-          orderId: order._id,
-          items: order.items.map(item => ({
-            productId: item.product,
-            quantity: item.quantity
-          }))
-        }
-      );
-    } catch (error) {
-      logger.error('Inventory release failed:', error);
-    }
-
-    // Publish order cancelled event
-    try {
-      await publisher.publish('order.cancelled', {
+      const inventoryPayload = {
         orderId: order._id,
-        userId: order.user,
-        reason
-      });
-    } catch (error) {
-      logger.warn('Failed to publish order.cancelled event:', error);
+        items: order.items.map(item => ({
+          productId: item.product,
+          quantity: item.quantity
+        }))
+      };
+      await publisher.publish('product.stock.increase', inventoryPayload); // Veya 'product.stock.release'
+      logger.info(`Published stock release request for cancelled order ${order.orderNumber}`);
+    } catch (publishError) {
+      logger.error(`🚨 CRITICAL: Failed to publish stock release event for cancelled order ${order.orderNumber}:`, publishError);
+      
     }
+
+   
+    
+    if (['confirmed', 'processing'].includes(order.status) && order.paymentStatus === 'completed') {
+        try {
+            await publisher.publish('payment.refund', { orderId: order._id, amount: order.total /*...*/ });
+            logger.info(`Published payment refund request for cancelled order ${order.orderNumber}`);
+        } catch(publishError) { logger.error(`🚨 CRITICAL: Failed to publish payment refund event for order ${order.orderNumber}:`, publishError); }
+    }
+
+
+   
+    try {
+       await publisher.publish('notification.order.cancelled', { orderId: order._id, userEmail: req.user.email, orderNumber: order.orderNumber, reason });
+       logger.info(`Published order cancelled notification event for order ${order.orderNumber}`);
+    } catch(publishError) { logger.warn('Failed to publish order cancelled notification event:', publishError); }
+
 
     res.status(httpStatus.OK).json(
-      ResponseFormatter.success(order, 'Sipariş iptal edildi')
+      ResponseFormatter.success(order, 'Sipariş başarıyla iptal edildi')
     );
   });
 
