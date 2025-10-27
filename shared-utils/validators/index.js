@@ -4,4 +4,5 @@ module.exports = {
   ProductValidators: require('./productValidators'),
   BrandValidators: require('./brandValidators'),
   CategoryValidators: require('./categoryValidators'),
+  OrderValidators: require('./orderValidators'),
 };

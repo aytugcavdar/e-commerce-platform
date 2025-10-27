@@ -41,9 +41,9 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/products', productRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/brands', brandRoutes);
+app.use('/api/products/products', productRoutes);   
+app.use('/api/products/categories', categoryRoutes); 
+app.use('/api/products/brands', brandRoutes);
 
 // Error handling
 app.use(ErrorHandler.notFound);
