@@ -16,6 +16,11 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - ecommerce-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   # 🚪 API Gateway
   gateway:
@@ -25,7 +30,7 @@ services:
     container_name: ecommerce-gateway
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${GATEWAY_PORT}:3000"
     environment:
       PORT: 3000
       USER_SERVICE_URL: http://user-service:5001
@@ -34,14 +39,17 @@ services:
       PAYMENT_SERVICE_URL: http://payment-service:5004
       INVENTORY_SERVICE_URL: http://inventory-service:5005
       SHIPPING_SERVICE_URL: http://shipping-service:5006
-      NODE_ENV: ${NODE_ENV:-development}
+      NODE_ENV: ${NODE_ENV}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
     depends_on:
-      - user-service
-      - product-service
-      - order-service
-      - inventory-service
-      - shipping-service
+      rabbitmq:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      order-service:
+        condition: service_started
     networks:
       - ecommerce-network
 
@@ -62,15 +70,13 @@ services:
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
-      RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
       EMAIL_HOST: ${EMAIL_HOST}
       EMAIL_PORT: ${EMAIL_PORT}
       EMAIL_USER: ${EMAIL_USER}
       EMAIL_PASS: ${EMAIL_PASS}
       EMAIL_FROM: ${EMAIL_FROM}
-    depends_on:
-      - mongo
-      - rabbitmq
+      CLIENT_URL: ${CLIENT_URL}
+      NODE_ENV: ${NODE_ENV}
     networks:
       - ecommerce-network
 
@@ -90,10 +96,8 @@ services:
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
-      RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
-    depends_on:
-      - mongo
-      - rabbitmq
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      NODE_ENV: ${NODE_ENV}
     networks:
       - ecommerce-network
 
@@ -113,11 +117,14 @@ services:
       RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
       INVENTORY_SERVICE_URL: http://inventory-service:5005
       PRODUCT_SERVICE_URL: http://product-service:5002
+      NODE_ENV: ${NODE_ENV}
     depends_on:
-      - mongo
-      - rabbitmq
-      - inventory-service
-      - product-service
+      rabbitmq:
+        condition: service_healthy
+      inventory-service:
+        condition: service_started
+      product-service:
+        condition: service_started
     networks:
       - ecommerce-network
 
@@ -125,15 +132,19 @@ services:
   payment-service:
     build:
       context: .
-      dockerfile: ./services/payment-service/Dockerfile
+      dockerfile: ./services/payment-service/dockerfile
     container_name: ecommerce-payment-service
     restart: unless-stopped
+    expose:
+      - "5004"
     environment:
       MONGODB_URI: ${MONGODB_URI_PAYMENT}
+      PORT: 5004
       RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+      NODE_ENV: ${NODE_ENV}
     depends_on:
-      - mongo
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ecommerce-network
 
@@ -151,9 +162,10 @@ services:
       PORT: 5005
       JWT_SECRET: ${JWT_SECRET}
       RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+      NODE_ENV: ${NODE_ENV}
     depends_on:
-      - mongo
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ecommerce-network
 
@@ -171,9 +183,10 @@ services:
       PORT: 5006
       JWT_SECRET: ${JWT_SECRET}
       RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+      NODE_ENV: ${NODE_ENV}
     depends_on:
-      - mongo
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ecommerce-network
 
@@ -191,13 +204,14 @@ services:
       EMAIL_USER: ${EMAIL_USER}
       EMAIL_PASS: ${EMAIL_PASS}
       EMAIL_FROM: ${EMAIL_FROM}
+      NODE_ENV: ${NODE_ENV}
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ecommerce-network
 
 volumes:
-  mongo_data:
   rabbitmq_data:
 
 networks:

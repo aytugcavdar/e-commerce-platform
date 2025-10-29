@@ -16,18 +16,18 @@ RUN npm install --omit=dev
 # Copy shared-utils
 COPY shared-utils ./shared-utils
 
-# Copy order service files
-COPY services/order-service ./services/order-service
+# Copy gateway files
+COPY gateway ./gateway
 
-# Set working directory to order service
-WORKDIR /app/services/order-service
+# Set working directory to gateway
+WORKDIR /app/gateway
 
 # Expose port
-EXPOSE 5003
+EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:5003/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
 
-# Start the service
+# Start the gateway
 CMD ["node", "server.js"]
