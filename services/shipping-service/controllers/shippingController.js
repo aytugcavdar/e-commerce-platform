@@ -1,5 +1,6 @@
 const Shipment = require('../models/Shipment');
 const {
+  middleware: { asyncHandler },
   helpers: { ResponseFormatter },
   constants: { httpStatus, errorMessages },
   logger,

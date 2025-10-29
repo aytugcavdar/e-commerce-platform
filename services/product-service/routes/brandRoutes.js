@@ -2,8 +2,12 @@ const express = require('express');
 const multer = require('multer');
 const BrandController = require('../controllers/brandController');
 
-const { middleware } = require('@ecommerce/shared-utils');
+const { middleware, validators } = require('@ecommerce/shared-utils');
 
+// Validators'ı al
+const { BrandValidators } = validators;
+
+// Middleware'leri al
 const { 
   ValidationMiddleware, 
   AuthMiddleware,

@@ -6,27 +6,25 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-# Copy package files
+# Copy root package.json
 COPY package*.json ./
-COPY shared-utils/package*.json ./shared-utils/
-
-# Install dependencies
-RUN npm install --omit=dev
 
 # Copy shared-utils
 COPY shared-utils ./shared-utils
 
-# Copy notification service files
+# Install root dependencies
+RUN npm install --omit=dev
+
+# Copy notification service
 COPY services/notification-service ./services/notification-service
 
-# Set working directory to notification service
+# Install notification service dependencies
 WORKDIR /app/services/notification-service
+RUN npm install --omit=dev
 
 # No port exposure needed (only RabbitMQ consumer)
-# Optionally expose a health check port if needed
-# EXPOSE 5007
 
-# Health check (optional - checks if the process is running)
+# Health check (checks if the process is running)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD pgrep -f "node.*server.js" > /dev/null || exit 1
 

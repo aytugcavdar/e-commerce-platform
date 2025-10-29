@@ -132,7 +132,7 @@ services:
   payment-service:
     build:
       context: .
-      dockerfile: ./services/payment-service/dockerfile
+      dockerfile: ./services/payment-service/Dockerfile
     container_name: ecommerce-payment-service
     restart: unless-stopped
     expose:

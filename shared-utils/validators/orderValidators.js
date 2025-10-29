@@ -70,6 +70,17 @@ class OrderValidators {
   }
 
   /**
+   * Cancel Order Schema
+   */
+  static cancelOrderSchema() {
+    return Joi.object({
+      reason: Joi.string().max(500).allow('', null).messages({
+        'string.max': 'İptal nedeni en fazla 500 karakter olabilir.',
+      }),
+    });
+  }
+
+  /**
    * Update Order Status Schema
    */
   static updateOrderStatusSchema() {
@@ -92,13 +103,38 @@ class OrderValidators {
           'any.required': 'Sipariş durumu zorunludur.',
         }),
       note: Joi.string().allow('', null),
+      trackingNumber: Joi.string().allow('', null),
+      carrier: Joi.string().allow('', null),
     });
   }
 
   /**
-   * Order Query Schema
+   * Order Query Schema (User)
    */
   static orderQuerySchema() {
+    return Joi.object({
+      page: Joi.number().integer().min(1).default(1),
+      limit: Joi.number().integer().min(1).max(100).default(10),
+      status: Joi.string().valid(
+        'pending',
+        'confirmed',
+        'processing',
+        'shipped',
+        'out_for_delivery',
+        'delivered',
+        'cancelled',
+        'returned',
+        'refunded'
+      ),
+      startDate: Joi.date(),
+      endDate: Joi.date().greater(Joi.ref('startDate')),
+    });
+  }
+
+  /**
+   * Admin Order Query Schema
+   */
+  static adminOrderQuerySchema() {
     return Joi.object({
       page: Joi.number().integer().min(1).default(1),
       limit: Joi.number().integer().min(1).max(100).default(20),
@@ -115,8 +151,9 @@ class OrderValidators {
         'refunded'
       ),
       paymentStatus: Joi.string().valid('pending', 'completed', 'failed', 'refunded'),
-      user: Joi.string().hex().length(24),
-      orderNumber: Joi.string(),
+      startDate: Joi.date(),
+      endDate: Joi.date().greater(Joi.ref('startDate')),
+      search: Joi.string().trim().min(2),
     });
   }
 }

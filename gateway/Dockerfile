@@ -6,21 +6,26 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-# Copy package files
+# Copy root package.json
 COPY package*.json ./
-COPY shared-utils/package*.json ./shared-utils/
-
-# Install dependencies
-RUN npm install --omit=dev
 
 # Copy shared-utils
 COPY shared-utils ./shared-utils
 
-# Copy gateway files
+# Install shared-utils dependencies first
+WORKDIR /app/shared-utils
+RUN npm install --omit=dev
+
+# Go back to root and install root dependencies
+WORKDIR /app
+RUN npm install --omit=dev
+
+# Copy gateway
 COPY gateway ./gateway
 
-# Set working directory to gateway
+# Install gateway dependencies
 WORKDIR /app/gateway
+RUN npm install --omit=dev
 
 # Expose port
 EXPOSE 3000

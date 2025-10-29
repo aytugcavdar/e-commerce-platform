@@ -1,13 +1,10 @@
-// services/inventory-service/routes/inventoryRoutes.js
-
 const express = require('express');
 const InventoryController = require('../controllers/inventoryController');
 const { middleware, validators } = require('@ecommerce/shared-utils');
 
-// Gerekli middleware ve validator'ları al
+// Küçük harfle destructure et
 const { validationMiddleware, authMiddleware, rateLimitMiddleware } = middleware;
-// Az önce oluşturduğumuz validator
-const { InventoryValidators } = validators; // Bu ismin validators/index.js'teki export ile eşleştiğinden emin ol!
+const { InventoryValidators } = validators;
 
 const router = express.Router();
 
@@ -20,9 +17,8 @@ const router = express.Router();
  */
 router.post(
   '/check-bulk',
-  // Belki servisler arası iletişim için ayrı bir rate limit?
   rateLimitMiddleware.generalLimiter,
-  validationMiddleware.validateRequest({ body: InventoryValidators.checkStockBulkSchema() }), // Validator'ı çağırırken () kullan
+  validationMiddleware.validateRequest({ body: InventoryValidators.checkStockBulkSchema() }),
   InventoryController.checkStockBulk
 );
 
@@ -37,8 +33,8 @@ router.patch(
   '/:productId',
   authMiddleware.verifyToken,
   authMiddleware.isAdmin,
-  validationMiddleware.validateObjectId('productId'), // URL'deki ID geçerli mi?
-  validationMiddleware.validateRequest({ body: InventoryValidators.adjustStockSchema() }), // Validator'ı çağırırken () kullan
+  validationMiddleware.validateObjectId('productId'),
+  validationMiddleware.validateRequest({ body: InventoryValidators.adjustStockSchema() }),
   InventoryController.adjustStock
 );
 
@@ -48,11 +44,10 @@ router.patch(
  * @access  Private (Admin Only or Internal)
  */
 router.get(
-    '/:productId',
-    authMiddleware.verifyToken, // Yetkilendirme
-    // authMiddleware.isAdmin, // Belki admin olmayan yetkili servisler de erişebilir? Şimdilik admin kalsın.
-    validationMiddleware.validateObjectId('productId'),
-    InventoryController.getInventory // Controller bu senaryoyu yönetiyor (tek ID)
+  '/:productId',
+  authMiddleware.verifyToken,
+  validationMiddleware.validateObjectId('productId'),
+  InventoryController.getInventory
 );
 
 /**
@@ -61,12 +56,10 @@ router.get(
  * @access  Private (Admin Only or Internal)
  */
 router.get(
-    '/', // Base path '/'
-    authMiddleware.verifyToken,
-    // authMiddleware.isAdmin,
-    validationMiddleware.validateRequest({ query: InventoryValidators.getInventoryQuerySchema() }), // Validator'ı çağırırken () kullan
-    InventoryController.getInventory // Controller bu senaryoyu yönetiyor (çoklu ID)
+  '/',
+  authMiddleware.verifyToken,
+  validationMiddleware.validateRequest({ query: InventoryValidators.getInventoryQuerySchema() }),
+  InventoryController.getInventory
 );
-
 
 module.exports = router;

@@ -6,21 +6,21 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-# Copy package files
+# Copy root package.json
 COPY package*.json ./
-COPY shared-utils/package*.json ./shared-utils/
-
-# Install dependencies
-RUN npm install --omit=dev
 
 # Copy shared-utils
 COPY shared-utils ./shared-utils
 
-# Copy order service files
+# Install root dependencies
+RUN npm install --omit=dev
+
+# Copy order service
 COPY services/order-service ./services/order-service
 
-# Set working directory to order service
+# Install order service dependencies
 WORKDIR /app/services/order-service
+RUN npm install --omit=dev
 
 # Expose port
 EXPOSE 5003

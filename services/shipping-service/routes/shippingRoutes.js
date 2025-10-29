@@ -2,6 +2,7 @@ const express = require('express');
 const ShippingController = require('../controllers/shippingController');
 const { middleware, validators } = require('@ecommerce/shared-utils');
 
+// Küçük harfle destructure et
 const { validationMiddleware, authMiddleware } = middleware;
 
 const router = express.Router();
@@ -12,11 +13,10 @@ const router = express.Router();
  * @access  Private (User/Admin)
  */
 router.get(
-    '/:orderId',
-    authMiddleware.verifyToken, // Yetkilendirme gerekli
-    // TODO: Sipariş sahibi mi veya Admin mi kontrolü ekle
-    validationMiddleware.validateObjectId('orderId'), // Geçerli ID formatı mı?
-    ShippingController.getShipmentStatus
+  '/:orderId',
+  authMiddleware.verifyToken,
+  validationMiddleware.validateObjectId('orderId'),
+  ShippingController.getShipmentStatus
 );
 
 /**
@@ -25,13 +25,11 @@ router.get(
  * @access  Private (Admin Only)
  */
 router.patch(
-    '/:orderId/status',
-    authMiddleware.verifyToken, //
-    authMiddleware.isAdmin, // Sadece Admin
-    validationMiddleware.validateObjectId('orderId'), //
-    // TODO: Body için Joi validator ekle (status enum, notes string vb.)
-    ShippingController.updateShipmentStatus
+  '/:orderId/status',
+  authMiddleware.verifyToken,
+  authMiddleware.isAdmin,
+  validationMiddleware.validateObjectId('orderId'),
+  ShippingController.updateShipmentStatus
 );
-
 
 module.exports = router;
