@@ -6,9 +6,8 @@
   "workspaces": [
     "services/*",
     "shared-utils",
-    "gateway",
-    "frontend",
-    "admin-dashboard"
+    "gateway"
+  
   ],
   "scripts": {
     "start": "docker-compose up -d",

@@ -1,8 +1,7 @@
 // services/inventory-service/validators/inventoryValidators.js
 
 const Joi = require('joi');
-const { constants } = require('@ecommerce/shared-utils');
-const { errorMessages } = constants;
+const { errorMessages } = require('../constants');
 
 // Birden fazla ürünün stoğunu kontrol etmek için item şeması
 const inventoryCheckItemSchema = Joi.object({
