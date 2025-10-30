@@ -56,28 +56,73 @@ app.get('/health', (req, res) => {
   );
 });
 
+// === GÜNCELLENDİ (TÜM SERVİSLER EKLENDİ) ===
 app.get('/status', async (req, res) => {
   const services = {
-    'auth-service': process.env.AUTH_SERVICE_URL || 'http://E-commerce-auth-service:5001',
-    // Diğer servisler buraya eklenecek
+    'user-service': { 
+        url: process.env.USER_SERVICE_URL || 'http://user-service:5001', 
+        // user-service'de /health endpoint'i yok, 
+      
+        healthPath: '/api/auth/refresh-token',
+        method: 'POST'
+    },
+    'product-service': { 
+        url: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002', 
+        healthPath: '/health',
+        method: 'GET'
+    },
+    'order-service': { 
+        url: process.env.ORDER_SERVICE_URL || 'http://order-service:5003', 
+        healthPath: '/health',
+        method: 'GET'
+    },
+    'inventory-service': { 
+        url: process.env.INVENTORY_SERVICE_URL || 'http://inventory-service:5005', 
+        healthPath: '/api/inventory/health',
+        method: 'GET'
+    },
+    'shipping-service': { 
+        url: process.env.SHIPPING_SERVICE_URL || 'http://shipping-service:5006', 
+        healthPath: '/health',
+        method: 'GET'
+    },
+     'payment-service': { 
+        url: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:5004', 
+        healthPath: '/health',
+        method: 'GET'
+    }
   };
 
   const serviceStatuses = {};
   
-  for (const [serviceName, serviceUrl] of Object.entries(services)) {
+  for (const [serviceName, config] of Object.entries(services)) {
     try {
-      const response = await axios.get(`${serviceUrl}/health`, { timeout: 5000 });
-      serviceStatuses[serviceName] = {
-        status: response.status === 200 ? 'healthy' : 'unhealthy',
-        url: serviceUrl,
-        responseTime: response.headers['x-response-time'] || '< 100ms'
-      };
+      let response;
+      if (config.method === 'POST') {
+        // user-service için POST denemesi
+        await axios.post(`${config.url}${config.healthPath}`, {}, { timeout: 5000 });
+        // Servis ayakta ancak 400/401 dönebilir, bu normal.
+        serviceStatuses[serviceName] = { status: 'healthy', url: config.url };
+      } else {
+        // Diğer servisler için GET
+        response = await axios.get(`${config.url}${config.healthPath}`, { timeout: 5000 });
+        serviceStatuses[serviceName] = {
+          status: response.status === 200 ? 'healthy' : 'unhealthy',
+          url: config.url,
+          responseTime: response.headers['x-response-time'] || '< 100ms'
+        };
+      }
     } catch (error) {
-      serviceStatuses[serviceName] = {
-        status: 'unreachable',
-        url: serviceUrl,
-        error: error.message
-      };
+       // user-service'in 400/401 dönmesi 'unreachable' olduğu anlamına gelmez
+       if (serviceName === 'user-service' && error.response) {
+            serviceStatuses[serviceName] = { status: 'healthy', url: config.url, note: 'Responded with status ' + error.response.status };
+       } else {
+            serviceStatuses[serviceName] = {
+              status: 'unreachable',
+              url: config.url,
+              error: error.message
+            };
+       }
     }
   }
 
@@ -90,28 +135,104 @@ app.get('/status', async (req, res) => {
   );
 });
 
-// 🔐 Auth Service Proxy
+// === Proxy Hata Yakalayıcı (Tekrarı önlemek için) ===
+const onProxyError = (err, req, res) => {
+    logger.error(`Proxy Error (${req.path}):`, err.message);
+    res.status(httpStatus.SERVICE_UNAVAILABLE || 503).json(
+      ResponseFormatter.error('Service is currently unavailable', httpStatus.SERVICE_UNAVAILABLE || 503)
+    );
+};
+
+// 🔐 Auth Service (User Service) Proxy - DÜZELTİLDİ
 const authServiceProxy = createProxyMiddleware({
-  target: process.env.AUTH_SERVICE_URL || 'http://rentacar-auth-service:5001',
+  target: process.env.USER_SERVICE_URL || 'http://user-service:5001', // Yanlış 'rentacar' adresi 'user-service' olarak düzeltildi.
   changeOrigin: true,
   pathRewrite: {
     '^/api/auth': '/api/auth'
   },
-  onError: (err, req, res) => {
-    logger.error('Auth Service Proxy Error:', err.message);
-    res.status(httpStatus.SERVICE_UNAVAILABLE || 503).json(
-      ResponseFormatter.error('Auth service is currently unavailable', httpStatus.SERVICE_UNAVAILABLE || 503)
-    );
-  },
+  onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {
-    logger.info(`Proxying to Auth Service: ${req.method} ${req.url}`);
+    logger.info(`Proxying to User Service: ${req.method} ${req.url}`);
   },
   onProxyRes: (proxyRes, req, res) => {
-    logger.info(`Auth Service Response: ${proxyRes.statusCode}`);
+    logger.info(`User Service Response: ${proxyRes.statusCode}`);
   }
 });
-
 app.use('/api/auth', authServiceProxy);
+
+
+// 📦 Product Service Proxy
+const productServiceProxy = createProxyMiddleware({
+  target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/products': '/api/products' 
+  },
+  onError: onProxyError,
+  onProxyReq: (proxyReq, req, res) => {
+    logger.info(`Proxying to Product Service: ${req.method} ${req.url}`);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.info(`Product Service Response: ${proxyRes.statusCode}`);
+  }
+});
+app.use('/api/products', productServiceProxy);
+
+
+// 🛒 Order Service Proxy
+const orderServiceProxy = createProxyMiddleware({
+  target: process.env.ORDER_SERVICE_URL || 'http://order-service:5003',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/orders': '/api/orders'
+  },
+  onError: onProxyError,
+  onProxyReq: (proxyReq, req, res) => {
+    logger.info(`Proxying to Order Service: ${req.method} ${req.url}`);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.info(`Order Service Response: ${proxyRes.statusCode}`);
+  }
+});
+app.use('/api/orders', orderServiceProxy);
+
+
+// 📊 Inventory Service Proxy
+const inventoryServiceProxy = createProxyMiddleware({
+  target: process.env.INVENTORY_SERVICE_URL || 'http://inventory-service:5005',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/inventory': '/api/inventory'
+  },
+  onError: onProxyError,
+  onProxyReq: (proxyReq, req, res) => {
+    logger.info(`Proxying to Inventory Service: ${req.method} ${req.url}`);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.info(`Inventory Service Response: ${proxyRes.statusCode}`);
+  }
+});
+app.use('/api/inventory', inventoryServiceProxy);
+
+
+// 🚚 Shipping Service Proxy
+const shippingServiceProxy = createProxyMiddleware({
+  target: process.env.SHIPPING_SERVICE_URL || 'http://shipping-service:5006',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/shipping': '/api/shipping'
+  },
+  onError: onProxyError,
+  onProxyReq: (proxyReq, req, res) => {
+    logger.info(`Proxying to Shipping Service: ${req.method} ${req.url}`);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.info(`Shipping Service Response: ${proxyRes.statusCode}`);
+  }
+});
+app.use('/api/shipping', shippingServiceProxy);
+
+// =============================
 
 app.use(ErrorHandler.notFound);
 
@@ -123,7 +244,12 @@ const startServer = async () => {
   try {
     app.listen(PORT, () => {
       logger.info(`🚪 API Gateway is running on port ${PORT}`);
-      logger.info(`🔗 Auth Service URL: ${process.env.AUTH_SERVICE_URL || 'http://rentacar-auth-service:5001'}`);
+      logger.info(`🔗 User (Auth) Service URL: ${process.env.USER_SERVICE_URL || 'http://user-service:5001'}`);
+      logger.info(`🔗 Product Service URL: ${process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002'}`);
+      logger.info(`🔗 Order Service URL: ${process.env.ORDER_SERVICE_URL || 'http://order-service:5003'}`);
+      logger.info(`🔗 Inventory Service URL: ${process.env.INVENTORY_SERVICE_URL || 'http://inventory-service:5005'}`);
+      logger.info(`🔗 Shipping Service URL: ${process.env.SHIPPING_SERVICE_URL || 'http://shipping-service:5006'}`);
+      logger.info(`🔗 Payment Service (Health Check): ${process.env.PAYMENT_SERVICE_URL || 'http://payment-service:5004'}`);
       logger.info(`🌐 CORS Origins: ${process.env.ALLOWED_ORIGINS || 'http://localhost:3000'}`);
     });
   } catch (error) {
