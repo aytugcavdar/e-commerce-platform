@@ -17,11 +17,10 @@ const app = express();
 
 CloudinaryHelper.init();
 
-app.use(cors());
 app.use(express.json());
 
 // Auth Routes
-app.use('/api/auth', authRoutes);
+app.use('/', authRoutes);
 
 // Hata yakalama middleware'i
 app.use(ErrorHandler.notFound);

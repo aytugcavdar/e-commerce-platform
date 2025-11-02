@@ -1,6 +1,14 @@
 // frontend/src/shared/services/api/client.ts
 
-import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios';
+
+// Tip (Type) import'ları
+import type { 
+  AxiosInstance, 
+  AxiosError, 
+  InternalAxiosRequestConfig 
+} from 'axios';
+
 import { env } from '@/config/env';
 
 /**

@@ -145,10 +145,10 @@ const onProxyError = (err, req, res) => {
 
 // 🔐 Auth Service (User Service) Proxy - DÜZELTİLDİ
 const authServiceProxy = createProxyMiddleware({
-  target: process.env.USER_SERVICE_URL || 'http://user-service:5001', // Yanlış 'rentacar' adresi 'user-service' olarak düzeltildi.
+  target: process.env.USER_SERVICE_URL || 'http://user-service:5001', 
   changeOrigin: true,
   pathRewrite: {
-    '^/api/auth': '/api/auth'
+    '^/api/auth': ''
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {
@@ -166,7 +166,7 @@ const productServiceProxy = createProxyMiddleware({
   target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/products': '/api/products' 
+    '^/api/products': '' 
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {

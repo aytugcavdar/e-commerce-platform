@@ -1,6 +1,7 @@
 // frontend/src/features/auth/store/authSlice.ts
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AuthState, User } from '../types/auth.types';
 import { env } from '@/config/env';
 import { loginUser, registerUser, logoutUser, verifyEmail } from './authThunks';
