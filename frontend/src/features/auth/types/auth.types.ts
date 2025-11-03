@@ -124,7 +124,6 @@ export interface RegisterResponse {
  */
 export interface VerifyEmailRequest {
   token: string;                  // URL'den gelen token
-  email: string;                  // E-posta
 }
 
 /**

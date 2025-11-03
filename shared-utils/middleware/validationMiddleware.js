@@ -80,7 +80,6 @@ class ValidationMiddleware {
               .status(httpStatus.BAD_REQUEST)
               .json(ResponseFormatter.error('Invalid query parameters', httpStatus.BAD_REQUEST, errors));
           }
-          req.query = value;
         }
 
         next();

@@ -1,4 +1,6 @@
 const { httpStatus } = require('../constants');
+const TokenHelper = require('./tokenHelper');
+const  ResponseFormatter  = require('./responseFormatter');
 
 class CookieHelper {
   static getCookieOptions(customOptions = {}) {
@@ -56,7 +58,7 @@ class CookieHelper {
     return undefined;
   }
 
-  static sendTokensResponse(res, user, ResponseFormatter, statusCode = httpStatus.OK, message = 'İşlem başarılı') {
+  static sendTokensResponse(res, user, message = 'İşlem başarılı', statusCode = httpStatus.OK) {
     const accessToken = TokenHelper.generateAccessToken(user);
     const refreshToken = TokenHelper.generateRefreshToken(user._id);
 

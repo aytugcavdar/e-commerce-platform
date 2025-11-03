@@ -183,9 +183,7 @@ export const verifyEmail = createAsyncThunk(
         params: {
           token: verifyData.token,
         },
-        data: {
-          email: verifyData.email,
-        },
+        
       });
       
       return data;

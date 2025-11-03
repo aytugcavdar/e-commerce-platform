@@ -1,6 +1,6 @@
 // frontend/src/features/products/store/productsSlice.ts
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { ProductsState, Product, ProductFilters, PaginationInfo } from '../types/product.types';
 import {
   fetchProducts,

@@ -140,11 +140,11 @@ class AuthController {
 
   static verifyEmail = asyncHandler(async (req, res) => {
     const { token } = req.query;
-    const { email } = req.body;
 
-    if (!token || !email) {
+
+    if (!token) {
       return res.status(httpStatus.BAD_REQUEST).json(
-        ResponseFormatter.error('Token ve e-posta gerekli', httpStatus.BAD_REQUEST)
+        ResponseFormatter.error('Token gerekli', httpStatus.BAD_REQUEST)
       );
     }
 
@@ -152,7 +152,6 @@ class AuthController {
     const hashedToken = TokenHelper.hashToken(token);
 
     const user = await User.findOne({ 
-      email,
       emailVerificationToken: hashedToken,
       emailVerificationExpires: { $gt: Date.now() }
     });
