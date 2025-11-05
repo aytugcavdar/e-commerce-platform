@@ -1,21 +1,20 @@
 // frontend/src/features/products/components/ProductSearch.tsx
 
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useProductFilters } from '../hooks/useProductFilters';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+// 'useProductFilters' hook'u kaldırıldı, 'useSearchParams' eklendi.
 
 /**
  * 🎓 ÖĞREN: ProductSearch Component
- * 
+ *
  * Ürün arama çubuğu component'i.
- * Header'a veya ProductsPage'e eklenebilir.
- * 
- * Özellikler:
- * - Real-time arama (debounce ile)
- * - Klavye navigasyonu (Enter tuşu ile arama)
- * - Temizle butonu
- * - Auto-focus (opsiyonel)
- * - Placeholder animasyonu
+ * Header'a veya başka bir sayfaya eklenebilir.
+ *
+ * Sorumluluğu:
+ * - Kullanıcıdan arama metnini almak.
+ * - Submit edildiğinde kullanıcıyı arama sonuçları sayfasına
+ * (ProductsPage) yönlendirmek.
+ * - URL'deki 'search' parametresi ile senkronize çalışmak.
  */
 
 interface ProductSearchProps {
@@ -32,54 +31,59 @@ const ProductSearch = ({
   className = '',
 }: ProductSearchProps) => {
   const navigate = useNavigate();
-  const { filters, updateFilter } = useProductFilters();
-  const [query, setQuery] = useState(filters.search || '');
+  const [searchParams] = useSearchParams(); // URL'i okumak için
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Başlangıç state'ini global filter hook'u yerine URL'den al
+  const [query, setQuery] = useState(searchParams.get('search') || '');
 
   /**
    * 🔄 URL'deki search parametresi değiştiğinde input'u güncelle
+   * (Örn: kullanıcı filtrelerden aramayı temizlerse veya tarayıcıda ileri/geri yaparsa)
    */
   useEffect(() => {
-    setQuery(filters.search || '');
-  }, [filters.search]);
+    setQuery(searchParams.get('search') || '');
+  }, [searchParams]);
 
   /**
-   * 🔍 Arama Fonksiyonu
+   * 🔍 Arama Fonksiyonu (Basitleştirildi)
+   * Form submit edildiğinde çalışır.
    */
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (query.trim()) {
-      // Filtre güncelle
-      updateFilter('search', query.trim());
-      
-      // Custom callback varsa çağır
-      onSearch?.(query.trim());
-      
-      // Products sayfasına yönlendir (eğer farklı bir sayfadaysa)
-      if (!window.location.pathname.includes('/products')) {
-        navigate(`/products?search=${encodeURIComponent(query.trim())}`);
-      }
+    const searchQuery = query.trim();
+
+    // Custom callback varsa çağır (opsiyonel)
+    onSearch?.(searchQuery);
+
+    if (searchQuery) {
+      // Her zaman /products sayfasına yönlendir.
+      // Bu sayfa zaten URL'deki 'search' parametresini okuyup
+      // filtrelemeyi yapacaktır.
+      navigate(`/products?search=${encodeURIComponent(searchQuery)}`);
     } else {
-      // Boşsa search filtresini temizle
-      updateFilter('search', undefined);
+      // Boşsa (veya sadece boşluk varsa) ve arama yapmaya çalışırsa
+      // arama parametresi olmadan /products'a gitsin (tüm ürünler)
+      navigate('/products');
     }
   };
 
   /**
    * ❌ Arama Temizleme
+   * Input'u temizler ve tüm ürünler sayfasına yönlendirir.
    */
   const handleClear = () => {
     setQuery('');
-    updateFilter('search', undefined);
+    // Filtre hook'u yerine, arama parametresi olmayan /products'a git
+    navigate('/products');
     inputRef.current?.focus();
   };
 
   /**
    * ⌨️ Klavye Kısayolları
+   * ESC tuşuna basıldığında aramayı temizle
    */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // ESC tuşuna basıldığında temizle
     if (e.key === 'Escape') {
       handleClear();
     }
@@ -134,7 +138,8 @@ const ProductSearch = ({
 
           <button
             type="submit"
-            disabled={!query.trim()}
+            // Boş arama "tüm ürünleri göster" anlamına geldiği için
+            // 'disabled' özelliğini kaldırdık.
             className="mr-1 px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
           >
             Ara
@@ -144,8 +149,8 @@ const ProductSearch = ({
 
       {/* 💡 Arama İpucu (Opsiyonel) */}
       {query.length > 0 && query.length < 3 && (
-        <p className="mt-1 text-xs text-gray-500">
-          En az 3 karakter girin
+        <p className="mt-1 text-xs text-gray-500 absolute">
+          Aramak için Enter'a basın
         </p>
       )}
     </form>
@@ -153,106 +158,3 @@ const ProductSearch = ({
 };
 
 export default ProductSearch;
-
-/**
- * 🎯 KULLANIM ÖRNEKLERİ:
- * 
- * // 1. Header'da Kullanım
- * const Header = () => {
- *   return (
- *     <header>
- *       <ProductSearch className="w-full md:w-96" />
- *     </header>
- *   );
- * };
- * 
- * // 2. ProductsPage'de Kullanım
- * const ProductsPage = () => {
- *   const handleSearch = (query: string) => {
- *     console.log('Aranan:', query);
- *   };
- *   
- *   return (
- *     <div>
- *       <ProductSearch
- *         onSearch={handleSearch}
- *         autoFocus
- *         placeholder="Ne aramıştınız?"
- *       />
- *     </div>
- *   );
- * };
- * 
- * // 3. Mobil Drawer'da
- * const MobileSearch = () => {
- *   const [isOpen, setIsOpen] = useState(false);
- *   
- *   return (
- *     <>
- *       <button onClick={() => setIsOpen(true)}>
- *         🔍 Ara
- *       </button>
- *       
- *       {isOpen && (
- *         <div className="fixed inset-0 bg-white z-50 p-4">
- *           <ProductSearch autoFocus />
- *           <button onClick={() => setIsOpen(false)}>Kapat</button>
- *         </div>
- *       )}
- *     </>
- *   );
- * };
- */
-
-/**
- * 💡 PRO TIP: Debouncing Ekle
- * 
- * Real-time arama için debounce kullan:
- * 
- * import { useState, useEffect } from 'react';
- * 
- * const [query, setQuery] = useState('');
- * const [debouncedQuery, setDebouncedQuery] = useState('');
- * 
- * useEffect(() => {
- *   const timer = setTimeout(() => {
- *     setDebouncedQuery(query);
- *   }, 500);
- *   
- *   return () => clearTimeout(timer);
- * }, [query]);
- * 
- * useEffect(() => {
- *   if (debouncedQuery) {
- *     updateFilter('search', debouncedQuery);
- *   }
- * }, [debouncedQuery]);
- */
-
-/**
- * 🔥 BEST PRACTICE: Search Suggestions
- * 
- * Autocomplete için:
- * 
- * const [suggestions, setSuggestions] = useState<string[]>([]);
- * const [showSuggestions, setShowSuggestions] = useState(false);
- * 
- * useEffect(() => {
- *   if (query.length >= 3) {
- *     // API'den öneriler getir
- *     apiClient.get(`/products/search/suggestions?q=${query}`)
- *       .then(res => setSuggestions(res.data));
- *   }
- * }, [query]);
- * 
- * // Suggestions dropdown render et
- * {showSuggestions && suggestions.length > 0 && (
- *   <div className="absolute top-full mt-1 w-full bg-white shadow-lg">
- *     {suggestions.map(s => (
- *       <button key={s} onClick={() => setQuery(s)}>
- *         {s}
- *       </button>
- *     ))}
- *   </div>
- * )}
- */

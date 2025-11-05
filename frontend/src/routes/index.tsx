@@ -67,7 +67,7 @@ const CheckoutPage = lazy(() => import('@/features/orders/pages/CheckoutPage'));
 const ProductsPage = lazy(() => import('@/features/products/pages/ProductsPage'));
 const ProductDetailPage = lazy(() => import('@/features/products/pages/ProductDetailPage'));
 const CartPage = lazy(() => import('@/features/cart/pages/CartPage'));
-const ProductSearchPage = lazy(() => import('@/features/products/pages/ProductSearchPage'));
+
 
 // ============================================
 // ADMIN PAGES (Sadece Admin)
@@ -101,7 +101,6 @@ const AppRoutes = () => {
           
           {/* Ürünler */}
           <Route path="/products" element={<ProductsPage />} />
-          <Route path="/products/search" element={<ProductSearchPage />} />
           <Route path="/products/:slug" element={<ProductDetailPage />} />
           
           {/* Sepet */}

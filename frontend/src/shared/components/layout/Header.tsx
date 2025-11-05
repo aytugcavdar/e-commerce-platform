@@ -5,13 +5,14 @@ import { useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import Container from './Container';
 import { env } from '@/config/env';
+import ProductSearch from '@/features/products/components/ProductSearch'; // YENİ: ProductSearch import edildi
 
 /**
  * 🎓 ÖĞREN: Header Component
  *
  * Sorumlulukları:
  * 1. Marka/Logo gösterimi (Ana sayfaya link).
- * 2. Navigasyon menüsü (Ana sayfalar).
+ * 2. Merkezi Arama Çubuğu.
  * 3. Kimlik doğrulama durumu (Auth State) yönetimi:
  * - Giriş yapılmamışsa: "Giriş Yap" / "Kayıt Ol" butonları.
  * - Giriş yapılmışsa: Profil dropdown menüsü, "Çıkış Yap" ve "Sepet" ikonu.
@@ -24,14 +25,15 @@ const Header = () => {
   // 🎯 useAuth hook'u ile state'i alıyoruz
   const { isAuthenticated, user, isAdmin, logout } = useAuth();
 
-  // 🚀 E-ticaret projesine uygun navigasyon linkleri
+  // 🚀 Amazon tarzı, sadeleştirilmiş navigasyon linkleri
+  // "Hakkımızda" ve "İletişim" footer'a taşınmalı.
+  // "Siparişlerim" zaten profil dropdown'da mevcut.
   const navLinks = [
     { to: '/', text: 'Ana Sayfa' },
     { to: '/products', text: 'Ürünler' },
-    { to: '/about', text: 'Hakkımızda' },
-    { to: '/contact', text: 'İletişim' },
-    // 🔒 Sadece giriş yapmış kullanıcılar görebilir
-    { to: '/orders', text: 'Siparişlerim', auth: true },
+    // { to: '/about', text: 'Hakkımızda' }, // Footer'a taşındı
+    // { to: '/contact', text: 'İletişim' }, // Footer'a taşındı
+    // { to: '/orders', text: 'Siparişlerim', auth: true }, // Profil dropdown'da zaten var
     // 🔑 Sadece admin görebilir
     { to: '/admin', text: 'Admin Paneli', auth: true, admin: true },
   ];
@@ -70,23 +72,25 @@ const Header = () => {
   return (
     <header className="bg-white shadow-md sticky top-0 z-50">
       <Container>
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2" onClick={closeMobileMenu}>
+        <div className="flex items-center justify-between h-16 gap-4 md:gap-8">
+          {/* Logo (Sabit genişlik) */}
+          <Link to="/" className="flex items-center space-x-2 flex-shrink-0" onClick={closeMobileMenu}>
             <div className="bg-blue-600 text-white rounded-lg p-2">
               {/* 🛍️ E-Ticaret İkonu */}
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
             </div>
-            <span className="text-xl font-bold text-gray-900">{env.appName}</span>
+            <span className="text-xl font-bold text-gray-900 hidden sm:inline">{env.appName}</span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-6">{renderNavLinks()}</nav>
+          {/* YENİ: Merkezi Arama Çubuğu (Desktop) (Esnek genişlik) */}
+          <div className="hidden md:block flex-1 max-w-2xl mx-auto">
+            <ProductSearch />
+          </div>
 
-          {/* Auth & Cart Buttons (Desktop) */}
-          <div className="hidden md:flex items-center space-x-4">
+          {/* Auth & Cart Buttons (Desktop) (Sabit genişlik) */}
+          <div className="hidden md:flex items-center space-x-4 flex-shrink-0">
             {isAuthenticated ? (
               <>
                 {/* 🛒 Sepet Butonu */}
@@ -117,7 +121,7 @@ const Header = () => {
                         </span>
                       )}
                     </div>
-                    <span>{user?.firstName}</span>
+                    <span className="hidden lg:inline">{user?.firstName}</span>
                     <svg 
                       className={`w-4 h-4 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} 
                       fill="none" 
@@ -174,13 +178,13 @@ const Header = () => {
               <>
                 <Link
                   to="/login"
-                  className="px-4 py-2 text-gray-700 hover:text-blue-600 transition-colors"
+                  className="px-4 py-2 text-gray-700 hover:text-blue-600 transition-colors text-sm font-medium"
                 >
                   Giriş Yap
                 </Link>
                 <Link
                   to="/register"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                 >
                   Kayıt Ol
                 </Link>
@@ -188,19 +192,35 @@ const Header = () => {
             )}
           </div>
 
-          {/* 📱 Mobile Menu Button */}
+          {/* 📱 Mobile Menu Button (Arama ikonunu buraya da taşıyabiliriz) */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="md:hidden p-2 rounded-lg hover:bg-gray-100"
             aria-label="Menüyü aç/kapat"
           >
-            {/* ... (SVG ikonu - Değişiklik yok) ... */}
+            {isMobileMenuOpen ? (
+              // Kapat İkonu
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              // Hamburger İkonu
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
           </button>
         </div>
 
         {/* 📱 Mobile Menu (Açılır) */}
         {isMobileMenuOpen && (
           <div className="md:hidden py-4 border-t">
+            
+            {/* YENİ: Mobil Arama Çubuğu */}
+            <div className="mb-4">
+              <ProductSearch autoFocus />
+            </div>
+
             <nav className="flex flex-col space-y-4 mb-4">{renderNavLinks(true)}</nav>
             <div className="border-t pt-4">
               {isAuthenticated ? (
