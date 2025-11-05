@@ -23,6 +23,8 @@ import { combineReducers } from '@reduxjs/toolkit';
 
 import authReducer from '@/features/auth/store/authSlice';
 import productsReducer from '@/features/products/store/productsSlice';
+import cartReducer from '@/features/cart/store/cartSlice';
+import ordersReducer from '@/features/orders/store/ordersSlice';
 
 const rootReducer = combineReducers({
   // 🔐 Authentication - Kullanıcı girişi, kayıt, token yönetimi
@@ -35,10 +37,10 @@ const rootReducer = combineReducers({
   // products: productsReducer,
   
   // 🛒 Cart - Sepet yönetimi, ürün ekleme/çıkarma
-  // cart: cartReducer,
+   cart: cartReducer,
   
   // 📦 Orders - Sipariş oluşturma, listeleme, takip
-  // orders: ordersReducer,
+   orders: ordersReducer,
   
   // 👤 User - Profil, adres yönetimi
   // user: userReducer,

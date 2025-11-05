@@ -166,7 +166,7 @@ const productServiceProxy = createProxyMiddleware({
   target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/products': '/' 
+    '^/api/products': '/api/products/products' 
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {
@@ -177,6 +177,38 @@ const productServiceProxy = createProxyMiddleware({
   }
 });
 app.use('/api/products', productServiceProxy);
+
+const brandServiceProxy = createProxyMiddleware({
+  target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/brands': '/api/products/brands' // Gelen /api/brands isteğini /api/products/brands olarak düzelt
+  },
+  onError: onProxyError,
+  onProxyReq: (proxyReq, req, res) => {
+    logger.info(`Proxying to Product Service (Brands): ${req.method} ${req.url}`);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.info(`Product Service (Brands) Response: ${proxyRes.statusCode}`);
+  }
+});
+app.use('/api/brands', brandServiceProxy);
+
+const categoryServiceProxy = createProxyMiddleware({
+  target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/categories': '/api/products/categories' // Gelen /api/categories isteğini /api/products/categories olarak düzelt
+  },
+  onError: onProxyError,
+  onProxyReq: (proxyReq, req, res) => {
+    logger.info(`Proxying to Product Service (Categories): ${req.method} ${req.url}`);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.info(`Product Service (Categories) Response: ${proxyRes.statusCode}`);
+  }
+});
+app.use('/api/categories', categoryServiceProxy);
 
 
 // 🛒 Order Service Proxy
