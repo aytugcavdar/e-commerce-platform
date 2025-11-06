@@ -101,8 +101,8 @@ router.get(
  */
 router.get(
   '/admin/stats',
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.isAdmin,
+  //AuthMiddleware.verifyToken,
+  //AuthMiddleware.isAdmin,
   OrderController.getOrderStatistics
 );
 

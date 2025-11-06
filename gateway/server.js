@@ -148,7 +148,7 @@ const authServiceProxy = createProxyMiddleware({
   target: process.env.USER_SERVICE_URL || 'http://user-service:5001', 
   changeOrigin: true,
   pathRewrite: {
-    '^/api/auth': ''
+    '^/api/auth': '/'
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {
@@ -216,7 +216,7 @@ const orderServiceProxy = createProxyMiddleware({
   target: process.env.ORDER_SERVICE_URL || 'http://order-service:5003',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/orders': '/api/orders'
+    '^/api/orders': ''
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {

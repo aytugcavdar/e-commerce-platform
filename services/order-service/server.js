@@ -36,7 +36,7 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/orders', orderRoutes);
+app.use('/', orderRoutes);
 
 // Error handling
 app.use(ErrorHandler.notFound);
