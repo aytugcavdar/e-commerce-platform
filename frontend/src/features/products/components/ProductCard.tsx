@@ -182,7 +182,11 @@ const ProductCard = ({ product, onAddToCart, onQuickView }: ProductCardProps) =>
           {/* Add to Cart Button */}
           {!isOutOfStock && onAddToCart && (
             <button
-              onClick={() => onAddToCart?.(product)}
+              onClick={(e) => {
+                e.preventDefault(); // Link'e tıklamayı engelle
+                e.stopPropagation(); // Event bubble'ı durdur
+                onAddToCart(product);
+              }}
               className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -222,76 +226,3 @@ const ProductCard = ({ product, onAddToCart, onQuickView }: ProductCardProps) =>
 };
 
 export default ProductCard;
-
-/**
- * 🎯 KULLANIM ÖRNEĞİ:
- * 
- * import ProductCard from '@/features/products/components/ProductCard';
- * 
- * const ProductList = ({ products }) => {
- *   const { addItem } = useCart();
- *   
- *   const handleAddToCart = (product: Product) => {
- *     addItem(product);
- *     toast.success('Ürün sepete eklendi!');
- *   };
- *   
- *   return (
- *     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
- *       {products.map((product) => (
- *         <ProductCard
- *           key={product._id}
- *           product={product}
- *           onAddToCart={handleAddToCart}
- *         />
- *       ))}
- *     </div>
- *   );
- * };
- */
-
-/**
- * 💡 PRO TIP: Line Clamp
- * 
- * Uzun metinleri kesmek için Tailwind'in line-clamp utility'sini kullan:
- * 
- * line-clamp-1  → 1 satır
- * line-clamp-2  → 2 satır
- * line-clamp-3  → 3 satır
- * 
- * CSS:
- * .line-clamp-2 {
- *   display: -webkit-box;
- *   -webkit-line-clamp: 2;
- *   -webkit-box-orient: vertical;
- *   overflow: hidden;
- * }
- */
-
-/**
- * 🔥 BEST PRACTICE: Image Optimization
- * 
- * 1. Lazy Loading:
- *    <img loading="lazy" />
- * 
- * 2. Responsive Images:
- *    <img srcSet="small.jpg 500w, large.jpg 1000w" />
- * 
- * 3. Next.js Image:
- *    <Image src="..." width={300} height={300} />
- * 
- * 4. Cloudinary Transformation:
- *    url.replace('/upload/', '/upload/w_300,h_300,c_fill/')
- */
-
-/**
- * 🎨 VARIANTS: Farklı Görünümler
- * 
- * interface ProductCardProps {
- *   variant?: 'grid' | 'list' | 'compact';
- * }
- * 
- * Grid: Kare kart (yukarıdaki)
- * List: Yatay kart (mobil için)
- * Compact: Küçük kart (sidebar için)
- */

@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import { useProducts } from '../hooks/useProducts';
+import { useCart } from '@/features/cart/hooks/useCart';
 import ProductList from '../components/ProductList';
 import ProductFilters from '../components/ProductFilters';
 import { Container } from '@/shared/components/layout';
 import { Button } from '@/shared/components/ui/base';
+import type { Product } from '../types/product.types';
 
 /**
  * 🎓 ÖĞREN: ProductsPage
@@ -16,8 +19,9 @@ import { Button } from '@/shared/components/ui/base';
  * Sorumlulukları:
  * 1. URL parametrelerinden filtreleri oku
  * 2. useProducts hook'u ile veri yönetimi
- * 3. ProductList ve ProductFilters component'lerini entegre et
- * 4. Pagination (sayfalama) yönetimi
+ * 3. useCart hook'u ile sepet yönetimi
+ * 4. ProductList ve ProductFilters component'lerini entegre et
+ * 5. Pagination (sayfalama) yönetimi
  */
 const ProductsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,6 +38,28 @@ const ProductsPage = () => {
     changePage,
     clearError,
   } = useProducts();
+
+  // 🎓 ÖĞREN: useCart Hook'unu Ekle
+  const { addItem } = useCart();
+
+  /**
+   * 🛒 Sepete Ekleme Handler'ı
+   * 
+   * 🎓 ÖĞREN: Bu fonksiyon neden gerekli?
+   * - ProductList'e callback olarak gönderiyoruz
+   * - ProductCard'dan çağrılınca burası çalışır
+   * - Toast mesajı gösterir (kullanıcı geri bildirim)
+   */
+  const handleAddToCart = (product: Product) => {
+    // 1. Sepete ekle (Redux action)
+    addItem(product, 1);
+    
+    // 2. Kullanıcıya bildir (Toast mesajı)
+    toast.success(`${product.name} sepete eklendi! 🎉`, {
+      duration: 2000,
+      position: 'top-right',
+    });
+  };
 
   /**
    * 🎯 İlk yükleme - URL parametrelerinden filtreleri oku
@@ -56,7 +82,7 @@ const ProductsPage = () => {
 
     updateFilters(initialFilters);
     applyFilters();
-  }, [searchParams]); // searchParams değiştiğinde tekrar çalışır
+  }, [searchParams]);
 
   /**
    * 🔍 Filtreleri URL'e senkronize et
@@ -177,11 +203,7 @@ const ProductsPage = () => {
             <ProductList
               products={products}
               loading={loading}
-              onAddToCart={(product) => {
-                // TODO: Faz 4'te cart'a ekleme yapılacak
-                console.log('Sepete eklendi:', product.name);
-                alert(`${product.name} sepete eklendi! (Cart feature Faz 4'te eklenecek)`);
-              }}
+              onAddToCart={handleAddToCart}
             />
 
             {/* 📄 Pagination */}
@@ -272,22 +294,3 @@ const ProductsPage = () => {
 };
 
 export default ProductsPage;
-
-/**
- * 🎯 ÖZELLİKLER:
- * 
- * ✅ URL Senkronizasyonu: Filtreler URL'de saklanır (refresh'te kaybolmaz)
- * ✅ Mobil Responsive: Mobilde filtreler açılır/kapanır
- * ✅ Loading State: Ürünler yüklenirken skeleton gösterir
- * ✅ Empty State: Ürün yoksa bilgilendirme mesajı
- * ✅ Error Handling: Hata varsa kullanıcıya gösterir
- * ✅ Pagination: Sayfa numaraları ve önceki/sonraki butonları
- * ✅ Sıralama: Dropdown ile sıralama seçenekleri
- * ✅ Sepete Ekleme: (Şimdilik alert, Faz 4'te gerçek cart eklenir)
- * 
- * 🚀 GELİŞTİRME FIRSATLARı:
- * - Infinite scroll eklenebilir (sayfa yerine)
- * - URL'de filtreleri hash olarak tutabilirsin (#filters=...)
- * - Filtreleri localStorage'a kaydet (kullanıcı tercihi)
- * - "Son görüntülenen ürünler" özelliği
- */

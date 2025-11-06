@@ -1,8 +1,8 @@
-// frontend/src/features/products/pages/ProductDetailPage.tsx
-
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import { useProducts } from '../hooks/useProducts';
+import { useCart } from '@/features/cart/hooks/useCart';
 import ProductCard from '../components/ProductCard';
 import { Container } from '@/shared/components/layout';
 import { Button } from '@/shared/components/ui/base';
@@ -18,7 +18,7 @@ import { Loading, ErrorMessage } from '@/shared/components/ui/feedback';
  * 2. Ürün detayını API'den çek
  * 3. Resim galerisi, açıklama, özellikler göster
  * 4. İlgili ürünler (related products) göster
- * 5. Sepete ekleme butonu
+ * 5. Sepete ekleme butonu (quantity ile)
  */
 const ProductDetailPage = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -34,6 +34,9 @@ const ProductDetailPage = () => {
     clearProduct,
   } = useProducts();
 
+  // 🎓 Sepet hook'u
+  const { addItem } = useCart();
+
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
 
@@ -44,13 +47,11 @@ const ProductDetailPage = () => {
     if (slug) {
       loadProductBySlug(slug).then((result) => {
         if (result.success && result.data) {
-          // İlgili ürünleri de yükle
           loadRelated(result.data._id, 6);
         }
       });
     }
 
-    // Cleanup: Sayfa kapanınca seçili ürünü temizle
     return () => {
       clearProduct();
     };
@@ -58,13 +59,25 @@ const ProductDetailPage = () => {
 
   /**
    * 📦 Sepete Ekle
+   * 
+   * 🎓 ÖĞREN: Burada quantity state'ini kullanıyoruz
+   * - Kullanıcı adet seçebilir (1-stock arası)
+   * - Toast mesajı gösterir
+   * - Başarılıysa quantity'yi 1'e sıfırla
    */
   const handleAddToCart = () => {
     if (!product) return;
     
-    // TODO: Faz 4'te cart'a ekleme yapılacak
-    console.log('Sepete eklendi:', product.name, 'Adet:', quantity);
-    alert(`${quantity} adet ${product.name} sepete eklendi! (Cart feature Faz 4'te eklenecek)`);
+    // Sepete ekle
+    addItem(product, quantity);
+    
+    // Toast mesajı
+    toast.success(`${quantity} adet ${product.name} sepete eklendi! 🎉`, {
+      duration: 2000,
+    });
+    
+    // Quantity'yi sıfırla (isteğe bağlı)
+    setQuantity(1);
   };
 
   /**
@@ -367,8 +380,10 @@ const ProductDetailPage = () => {
                   key={relatedProduct._id}
                   product={relatedProduct}
                   onAddToCart={(p) => {
-                    console.log('İlgili ürün sepete eklendi:', p.name);
-                    alert(`${p.name} sepete eklendi!`);
+                    addItem(p, 1);
+                    toast.success(`${p.name} sepete eklendi! 🎉`, {
+                      duration: 2000,
+                    });
                   }}
                 />
               ))}
@@ -381,24 +396,3 @@ const ProductDetailPage = () => {
 };
 
 export default ProductDetailPage;
-
-/**
- * 🎯 ÖZELLİKLER:
- * 
- * ✅ Resim Galerisi: Küçük resimlere tıklayarak ana resmi değiştir
- * ✅ Breadcrumb: Navigasyon kolaylığı
- * ✅ Adet Seçimi: +/- butonları ve input
- * ✅ Stok Kontrolü: Yetersiz stokta uyarı
- * ✅ İndirim Hesaplaması: İndirim yüzdesi ve orijinal fiyat
- * ✅ İlgili Ürünler: Aynı kategorideki diğer ürünler
- * ✅ Özellikler: Key-value formatında teknik detaylar
- * ✅ Kargo Bilgisi: Ücretsiz kargo/kargo ücreti
- * ✅ Favori Butonu: (Şimdilik sadece ikon, Faz 5'te işlevsel)
- * 
- * 🚀 GELİŞTİRME FIRSATLARI:
- * - Zoom özelliği (resim üzerine tıklayınca büyüt)
- * - Yorumlar ve değerlendirmeler
- * - Paylaşım butonları (sosyal medya)
- * - "Son görüntülenen ürünler" listesi
- * - Ürün karşılaştırma özelliği
- */

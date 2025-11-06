@@ -3,20 +3,18 @@
 import { Link, NavLink } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useCart } from '@/features/cart/hooks/useCart';
 import Container from './Container';
 import { env } from '@/config/env';
-import ProductSearch from '@/features/products/components/ProductSearch'; // YENİ: ProductSearch import edildi
+import ProductSearch from '@/features/products/components/ProductSearch';
 
 /**
  * 🎓 ÖĞREN: Header Component
  *
- * Sorumlulukları:
- * 1. Marka/Logo gösterimi (Ana sayfaya link).
- * 2. Merkezi Arama Çubuğu.
- * 3. Kimlik doğrulama durumu (Auth State) yönetimi:
- * - Giriş yapılmamışsa: "Giriş Yap" / "Kayıt Ol" butonları.
- * - Giriş yapılmışsa: Profil dropdown menüsü, "Çıkış Yap" ve "Sepet" ikonu.
- * 4. Mobil menü (responsive tasarım).
+ * Yeni Özellikler:
+ * - Sepet ikonu badge'i (ürün sayısı gösterir)
+ * - useCart hook'u ile totalItems alınır
+ * - Dinamik badge rengi (0 ürün → gri, >0 → kırmızı)
  */
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -24,16 +22,14 @@ const Header = () => {
 
   // 🎯 useAuth hook'u ile state'i alıyoruz
   const { isAuthenticated, user, isAdmin, logout } = useAuth();
+  
+  // 🎯 useCart hook'u ile sepet durumunu alıyoruz
+  const { totalItems } = useCart();
 
   // 🚀 Amazon tarzı, sadeleştirilmiş navigasyon linkleri
-  // "Hakkımızda" ve "İletişim" footer'a taşınmalı.
-  // "Siparişlerim" zaten profil dropdown'da mevcut.
   const navLinks = [
     { to: '/', text: 'Ana Sayfa' },
     { to: '/products', text: 'Ürünler' },
-    // { to: '/about', text: 'Hakkımızda' }, // Footer'a taşındı
-    // { to: '/contact', text: 'İletişim' }, // Footer'a taşındı
-    // { to: '/orders', text: 'Siparişlerim', auth: true }, // Profil dropdown'da zaten var
     // 🔑 Sadece admin görebilir
     { to: '/admin', text: 'Admin Paneli', auth: true, admin: true },
   ];
@@ -50,9 +46,7 @@ const Header = () => {
   // Dinamik olarak render edilecek navigasyon linkleri
   const renderNavLinks = (isMobile = false) =>
     navLinks
-      // Filtrele: Giriş gerektirmeyen VEYA giriş yapılmışsa
       .filter((link) => !link.auth || isAuthenticated)
-      // Filtrele: Admin gerektirmeyen VEYA admin ise
       .filter((link) => !link.admin || isAdmin)
       .map((link) => (
         <NavLink
@@ -76,7 +70,6 @@ const Header = () => {
           {/* Logo (Sabit genişlik) */}
           <Link to="/" className="flex items-center space-x-2 flex-shrink-0" onClick={closeMobileMenu}>
             <div className="bg-blue-600 text-white rounded-lg p-2">
-              {/* 🛍️ E-Ticaret İkonu */}
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
@@ -84,7 +77,7 @@ const Header = () => {
             <span className="text-xl font-bold text-gray-900 hidden sm:inline">{env.appName}</span>
           </Link>
 
-          {/* YENİ: Merkezi Arama Çubuğu (Desktop) (Esnek genişlik) */}
+          {/* Merkezi Arama Çubuğu (Desktop) (Esnek genişlik) */}
           <div className="hidden md:block flex-1 max-w-2xl mx-auto">
             <ProductSearch />
           </div>
@@ -96,14 +89,26 @@ const Header = () => {
                 {/* 🛒 Sepet Butonu */}
                 <Link
                   to="/cart"
-                  className="p-2 text-gray-700 hover:text-blue-600 rounded-full hover:bg-gray-100 transition-colors"
+                  className="relative p-2 text-gray-700 hover:text-blue-600 rounded-full hover:bg-gray-100 transition-colors"
                   title="Sepetim"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
-                  {/* Sepet öğe sayısı (Gelecekte eklenebilir) */}
-                  {/* <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">3</span> */}
+                  
+                  {/* 🎓 ÖĞREN: Badge (Sepet Sayısı)
+                   * 
+                   * Özellikler:
+                   * - totalItems > 0 ise göster
+                   * - Kırmızı arka plan, beyaz yazı
+                   * - Absolute position (ikonun üstünde)
+                   * - Küçük ve yuvarlak
+                   */}
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {totalItems > 99 ? '99+' : totalItems}
+                    </span>
+                  )}
                 </Link>
 
                 {/* 👤 Profil Dropdown */}
@@ -192,19 +197,17 @@ const Header = () => {
             )}
           </div>
 
-          {/* 📱 Mobile Menu Button (Arama ikonunu buraya da taşıyabiliriz) */}
+          {/* 📱 Mobile Menu Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="md:hidden p-2 rounded-lg hover:bg-gray-100"
             aria-label="Menüyü aç/kapat"
           >
             {isMobileMenuOpen ? (
-              // Kapat İkonu
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             ) : (
-              // Hamburger İkonu
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
@@ -216,7 +219,7 @@ const Header = () => {
         {isMobileMenuOpen && (
           <div className="md:hidden py-4 border-t">
             
-            {/* YENİ: Mobil Arama Çubuğu */}
+            {/* Mobil Arama Çubuğu */}
             <div className="mb-4">
               <ProductSearch autoFocus />
             </div>
@@ -228,8 +231,17 @@ const Header = () => {
                   <Link to="/profile" className="text-gray-700 hover:text-blue-600" onClick={closeMobileMenu}>
                     Profilim
                   </Link>
-                  <Link to="/cart" className="text-gray-700 hover:text-blue-600" onClick={closeMobileMenu}>
+                  <Link 
+                    to="/cart" 
+                    className="text-gray-700 hover:text-blue-600 flex items-center" 
+                    onClick={closeMobileMenu}
+                  >
                     Sepetim
+                    {totalItems > 0 && (
+                      <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {totalItems}
+                      </span>
+                    )}
                   </Link>
                   <button onClick={handleLogout} className="text-left text-red-600 hover:text-red-700">
                     Çıkış Yap
