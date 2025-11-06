@@ -10,7 +10,7 @@ import { useAppDispatch } from './app/hooks';
 import { checkTokenValidity } from './features/auth/store/authSlice';
 import AppRoutes from './routes';
 import { Loading } from './shared/components/ui/feedback';
-
+import { env } from './config/env';
 /**
  * 🔐 AUTH CHECKER COMPONENT
  * 
@@ -135,10 +135,26 @@ export default App;
  */
 if (import.meta.env.DEV) {
   window.addEventListener('load', () => {
-    const token = localStorage.getItem('auth_token');
+    // 👇 DÜZELTME: Sabit dize yerine env.tokenKey kullan
+    const token = localStorage.getItem(env.tokenKey);
+    
     if (token) {
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        const parts = token.split('.');
+        
+        // Token'ın 3 bölümden oluştuğunu kontrol et
+        if (parts.length !== 3) {
+            throw new Error('JWT formatı hatalı: Parça sayısı 3 değil.');
+        }
+
+        const base64Url = parts[1];
+        
+        // Base64 URL safe formatı standart Base64'e çevir
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        
+        // atob ve JSON.parse işlemlerini güvenli try/catch bloğunda yap
+        const payload = JSON.parse(atob(base64));
+
         console.log('🔐 Token Bilgileri:', {
           userId: payload.userId,
           role: payload.role,
@@ -149,7 +165,7 @@ if (import.meta.env.DEV) {
         console.error('❌ Token decode hatası:', error);
       }
     } else {
-      console.log('❌ Token bulunamadı');
+      console.log(`❌ Token bulunamadı (Aranan Key: ${env.tokenKey})`);
     }
   });
 }

@@ -14,10 +14,19 @@ import { loginUser, registerUser, logoutUser, verifyEmail } from './authThunks';
 const isTokenExpired = (token: string | null): boolean => {
   if (!token) return true;
   
+  // 🔥 DÜZELTME: Token'ın geçerli bir JWT formatında (en az 2 nokta) olup olmadığını kontrol et.
+  const parts = token.split('.');
+  if (parts.length < 3) {
+    console.error('❌ Token formatı hatalı (nokta sayısı eksik)');
+    return true;
+  }
+  
   try {
     // JWT token'ı decode et (payload kısmı)
-    const base64Url = token.split('.')[1];
+    const base64Url = parts[1]; // Düzeltildi
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    
+    // ... (kodun geri kalanı aynı)
     const jsonPayload = decodeURIComponent(
       atob(base64)
         .split('')
