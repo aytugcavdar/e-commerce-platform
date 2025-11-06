@@ -1,65 +1,52 @@
 // frontend/src/App.tsx
 
+import { useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { store, persistor } from './app/store';
+import { useAppDispatch } from './app/hooks';
+import { checkTokenValidity } from './features/auth/store/authSlice';
 import AppRoutes from './routes';
 import { Loading } from './shared/components/ui/feedback';
 
 /**
- * 🎓 ÖĞREN: App.tsx Nedir?
+ * 🔐 AUTH CHECKER COMPONENT
  * 
- * App.tsx, uygulamanın en üst seviyesidir (root component).
- * Tüm provider'lar (Redux, Router, Theme vb.) burada sarılır.
- * 
- * Provider Sırası Önemli:
- * 1. Redux Provider (En dışta)
- * 2. PersistGate (Redux Persist için)
- * 3. BrowserRouter (React Router için)
- * 4. Diğer provider'lar (Theme, Notification vb.)
- * 5. Routes (Sayfa yapısı)
+ * Redux store içinde çalışması gereken token kontrolü.
+ * Bu yüzden ayrı bir component'te.
  */
+const AuthChecker = () => {
+  const dispatch = useAppDispatch();
 
+  useEffect(() => {
+    // Uygulama başlatıldığında token'ı kontrol et
+    dispatch(checkTokenValidity());
+
+    // Her 5 dakikada bir token'ı kontrol et
+    const interval = setInterval(() => {
+      dispatch(checkTokenValidity());
+    }, 5 * 60 * 1000); // 5 dakika
+
+    return () => clearInterval(interval);
+  }, [dispatch]);
+
+  return null;
+};
+
+/**
+ * 🎯 MAIN APP COMPONENT
+ */
 function App() {
   return (
-    /**
-     * 🔴 REDUX PROVIDER
-     * 
-     * Redux store'u tüm uygulamaya sağlar.
-     * Herhangi bir component useSelector/useDispatch kullanabilir.
-     */
     <Provider store={store}>
-      {/**
-       * 🟡 PERSIST GATE
-       * 
-       * Redux Persist ile localStorage'dan state yüklenene kadar bekler.
-       * Loading component'i gösterir.
-       * 
-       * Neden gerekli?
-       * - State yüklenmeden önce component'ler render olmasın
-       * - Kullanıcı login olduysa, sayfa yenilendiğinde hala login olsun
-       */}
-      <PersistGate loading={<Loading fullScreen />} persistor={persistor}>
-        {/**
-         * 🟢 BROWSER ROUTER
-         * 
-         * React Router için routing context'i sağlar.
-         * URL yönetimi, navigation vb.
-         */}
+      <PersistGate loading={<Loading fullScreen message="Yükleniyor..." />} persistor={persistor}>
         <BrowserRouter>
-          {/**
-           * 🔵 TOAST NOTIFICATION
-           * 
-           * react-hot-toast kütüphanesi için.
-           * Başarı, hata, bilgi mesajları gösterir.
-           * 
-           * Kullanımı:
-           * toast.success('İşlem başarılı!');
-           * toast.error('Bir hata oluştu!');
-           * toast.loading('Yükleniyor...');
-           */}
+          {/* Token kontrolü */}
+          <AuthChecker />
+          
+          {/* Toast bildirimler */}
           <Toaster
             position="top-right"
             toastOptions={{
@@ -85,12 +72,7 @@ function App() {
             }}
           />
           
-          {/**
-           * 🎯 ROUTES
-           * 
-           * Tüm sayfa yapısı burada.
-           * Public, Protected, Admin routes vb.
-           */}
+          {/* Route'lar */}
           <AppRoutes />
         </BrowserRouter>
       </PersistGate>
@@ -101,57 +83,73 @@ function App() {
 export default App;
 
 /**
- * 🎯 PROVIDER SIRASI NEDEN ÖNEMLİ?
+ * 🎯 SORUN GİDERME:
  * 
- * Doğru Sıra:
- * <Provider>        ← En dışta (Redux)
- *   <PersistGate>   ← Redux state yükleme
- *     <Router>      ← Routing
- *       <Theme>     ← Tema
- *         <App />   ← Uygulama
- *       </Theme>
- *     </Router>
- *   </PersistGate>
- * </Provider>
+ * "Invalid token" hatası alıyorsanız:
  * 
- * Her provider, içindeki tüm component'lere context sağlar.
- * En dıştan başlayarak içe doğru sarılır.
+ * 1. Konsolu kontrol edin:
+ *    - "Token süresi dolmuş" mesajı varsa → Login olun
+ *    - Network hatası varsa → Backend çalışıyor mu?
+ * 
+ * 2. Application > Local Storage:
+ *    - auth_token var mı?
+ *    - Değeri geçerli mi? (jwt.io'da test edin)
+ * 
+ * 3. Redux DevTools:
+ *    - auth.isAuthenticated: true mi?
+ *    - auth.user: var mı?
+ *    - auth.token: var mı?
+ * 
+ * 4. Backend logs:
+ *    - Token doğrulama hatası var mı?
+ *    - JWT_SECRET doğru mu?
  */
 
 /**
- * 💡 PRO TIP: Error Boundary
+ * 💡 PRO TIP: Token Refresh
  * 
- * Production'da hata yakalamak için ErrorBoundary eklenebilir:
+ * Token süresi dolmadan önce yenileyin:
  * 
- * <ErrorBoundary fallback={<ErrorPage />}>
- *   <AppRoutes />
- * </ErrorBoundary>
- * 
- * Böylece uygulama çökerse kullanıcı hata sayfası görür.
+ * useEffect(() => {
+ *   const token = localStorage.getItem('auth_token');
+ *   if (!token) return;
+ *   
+ *   try {
+ *     const payload = JSON.parse(atob(token.split('.')[1]));
+ *     const expiresIn = (payload.exp * 1000) - Date.now();
+ *     
+ *     // 5 dakika kalınca yenile
+ *     if (expiresIn < 5 * 60 * 1000 && expiresIn > 0) {
+ *       dispatch(refreshToken());
+ *     }
+ *   } catch (error) {
+ *     console.error('Token decode hatası:', error);
+ *   }
+ * }, [dispatch]);
  */
 
 /**
- * 🔥 BEST PRACTICE: Provider Bileşeni
+ * 🔥 DEBUG MODE
  * 
- * Tüm provider'ları ayrı bir component'te toplayabilirsin:
- * 
- * // providers/AppProviders.tsx
- * const AppProviders = ({ children }) => (
- *   <Provider store={store}>
- *     <PersistGate>
- *       <BrowserRouter>
- *         <ThemeProvider>
- *           {children}
- *         </ThemeProvider>
- *       </BrowserRouter>
- *     </PersistGate>
- *   </Provider>
- * );
- * 
- * // App.tsx
- * <AppProviders>
- *   <AppRoutes />
- * </AppProviders>
- * 
- * Daha temiz ve okunabilir!
+ * Geliştirme sırasında token bilgilerini konsola yazdır:
  */
+if (import.meta.env.DEV) {
+  window.addEventListener('load', () => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        console.log('🔐 Token Bilgileri:', {
+          userId: payload.userId,
+          role: payload.role,
+          expiresAt: new Date(payload.exp * 1000).toLocaleString('tr-TR'),
+          isExpired: payload.exp < Math.floor(Date.now() / 1000),
+        });
+      } catch (error) {
+        console.error('❌ Token decode hatası:', error);
+      }
+    } else {
+      console.log('❌ Token bulunamadı');
+    }
+  });
+}
