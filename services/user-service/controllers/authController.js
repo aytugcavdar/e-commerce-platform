@@ -129,6 +129,8 @@ class AuthController {
 
     // Token oluştur ve cookie'lere ekle
     CookieHelper.sendTokensResponse(res, user);
+
+    console.log("BACKEND'DEN GELEN TÜM CEVAP:", res.data);
   });
 
   static logout = asyncHandler(async (req, res) => {

@@ -62,13 +62,14 @@ class CookieHelper {
     const accessToken = TokenHelper.generateAccessToken(user);
     const refreshToken = TokenHelper.generateRefreshToken(user._id);
 
+    this.setTokenCookie(res, accessToken);
     this.setRefreshTokenCookie(res, refreshToken);
 
     return res.status(statusCode).json(
       ResponseFormatter.success(
         {
           user: user.toJSON(),
-          accessToken,
+          
         },
         message
       )
