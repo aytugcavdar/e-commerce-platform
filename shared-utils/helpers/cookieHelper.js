@@ -8,13 +8,18 @@ class CookieHelper {
   static getCookieOptions(customOptions = {}) {
     const isProduction = process.env.NODE_ENV === 'production';
     
+    // ✅ LOCALHOST FIX: Development'ta farklı ayarlar
     const defaultOptions = {
-      httpOnly: true,                   
-      secure: true,             
-      sameSite: 'none',
-      path: '/',                        
-      domain: undefined,                 
+      httpOnly: true,
+      // ✅ Localhost için secure: false olmalı (HTTPS olmadan)
+      secure: isProduction,
+      // ✅ Localhost için sameSite: 'lax' yeterli
+      sameSite: isProduction ? 'none' : 'lax',
+      path: '/',
+      domain: undefined, // ✅ Localhost için domain belirtme
     };
+    
+    console.log('🍪 Cookie options:', { isProduction, ...defaultOptions });
     
     return { ...defaultOptions, ...customOptions };
   }
@@ -28,9 +33,9 @@ class CookieHelper {
     
     res.cookie('accessToken', token, cookieOptions);
     
-    // ✅ Debug: Cookie'nin set edildiğini logla
     console.log('🍪 Access Token Cookie Set:', {
       name: 'accessToken',
+      value: token.substring(0, 50) + '...',
       maxAge: accessExpireMs,
       options: cookieOptions
     });
@@ -47,9 +52,9 @@ class CookieHelper {
     
     res.cookie('refreshToken', refreshToken, cookieOptions);
     
-    // ✅ Debug: Cookie'nin set edildiğini logla
     console.log('🍪 Refresh Token Cookie Set:', {
       name: 'refreshToken',
+      value: refreshToken.substring(0, 50) + '...',
       maxAge: refreshExpireMs,
       options: cookieOptions
     });
@@ -63,6 +68,7 @@ class CookieHelper {
       maxAge: undefined 
     });
     res.cookie(cookieName, '', options);
+    console.log(`🗑️ Cookie cleared: ${cookieName}`);
     return res;
   }
 
@@ -78,17 +84,20 @@ class CookieHelper {
     // 1. Authorization header'dan al
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       token = req.headers.authorization.split(' ')[1];
+      console.log('🔑 Token from Authorization header');
     }
     // 2. Cookie'den al
     else if (req.cookies && req.cookies.accessToken) {
       token = req.cookies.accessToken;
+      console.log('🔑 Token from Cookie');
     }
     
-    // ✅ Debug: Token'ın alındığını logla
     if (token) {
       console.log('🔑 Access Token Found:', token.substring(0, 20) + '...');
     } else {
       console.warn('⚠️ No Access Token Found in Request');
+      console.log('📋 Request headers:', req.headers);
+      console.log('🍪 Request cookies:', req.cookies);
     }
     
     return token;
@@ -97,7 +106,6 @@ class CookieHelper {
   static getRefreshTokenFromRequest(req) {
     const token = req.cookies?.refreshToken;
     
-    // ✅ Debug: Token'ın alındığını logla
     if (token) {
       console.log('🔄 Refresh Token Found:', token.substring(0, 20) + '...');
     } else {
@@ -114,7 +122,7 @@ class CookieHelper {
     this.setTokenCookie(res, accessToken);
     this.setRefreshTokenCookie(res, refreshToken);
 
-    // ✅ Debug: Response header'ları logla
+    // ✅ Response header'larını logla
     console.log('📤 Response Headers:', {
       'Set-Cookie': res.getHeader('Set-Cookie')
     });

@@ -271,13 +271,24 @@ export const checkAuth = createAsyncThunk(
   'auth/checkAuth',
   async (_, { rejectWithValue }) => {
     try {
+      console.log('🔍 [checkAuth] Backend\'e istek atılıyor...');
+      console.log('🍪 [checkAuth] Mevcut cookie\'ler:', document.cookie);
+      
       // Backend'e istek at (cookie otomatik gönderilir)
       const { data } = await apiClient.get('/auth/me');
+      
+      console.log('✅ [checkAuth] Başarılı response:', data);
       
       return data.data; // { user }
       
     } catch (error: any) {
-      // 401 Unauthorized -> Token geçersiz, logout yap
+      console.error('❌ [checkAuth] Hata:', {
+        status: error.response?.status,
+        message: error.response?.data?.message || error.message,
+        cookies: document.cookie,
+      });
+      
+      // 401 Unauthorized -> Token geçersiz
       if (error.response?.status === 401) {
         return rejectWithValue('Unauthorized');
       }
@@ -290,6 +301,7 @@ export const checkAuth = createAsyncThunk(
     }
   }
 );
+
 
 /**
  * 🎯 KULLANIM ÖRNEĞİ:

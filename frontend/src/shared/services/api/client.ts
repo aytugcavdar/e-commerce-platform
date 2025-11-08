@@ -16,7 +16,7 @@ const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  withCredentials: true, // ✅ Cookie'leri otomatik gönder
+  withCredentials: true, // ✅ ZORUNLU: Cookie'leri gönder ve al
 });
 
 /**
@@ -28,7 +28,7 @@ apiClient.interceptors.request.use(
       console.log('📤 API Request:', {
         method: config.method?.toUpperCase(),
         url: config.url,
-        data: config.data,
+        withCredentials: config.withCredentials, // ✅ Debug için
       });
     }
     return config;
@@ -65,7 +65,8 @@ apiClient.interceptors.response.use(
       console.log('📥 API Response:', {
         url: response.config.url,
         status: response.status,
-        data: response.data,
+        // Cookie'leri logla
+        cookies: document.cookie,
       });
     }
     return response;
@@ -86,7 +87,6 @@ apiClient.interceptors.response.use(
       }
 
       // 🚫 2. /auth/me endpoint'ine istek atılıyorsa token yenileme yapma
-      // Çünkü bu zaten auth kontrolü için kullanılıyor
       if (config?.url?.includes('/auth/me')) {
         console.warn('⚠️ /auth/me başarısız, token geçersiz');
         return Promise.reject(error);
@@ -107,6 +107,7 @@ apiClient.interceptors.response.use(
       try {
         console.log('🔄 Token yenileniyor...');
         
+        // ✅ withCredentials: true ile refresh token cookie'si gönderilir
         await apiClient.post(AUTH_ENDPOINTS.REFRESH_TOKEN);
         
         console.log('✅ Token yenilendi');
@@ -166,13 +167,3 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
-
-/**
- * 💡 KULLANIM NOTU:
- * 
- * Bu client artık aşağıdaki endpoint'lerde token yenileme yapmaz:
- * 1. /auth/refresh-token (sonsuz döngü önlenir)
- * 2. /auth/me (auth kontrolü için kullanılır)
- * 
- * Diğer tüm endpoint'lerde 401 alındığında otomatik token yenileme yapılır.
- */
