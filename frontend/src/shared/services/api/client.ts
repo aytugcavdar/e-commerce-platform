@@ -28,7 +28,8 @@ apiClient.interceptors.request.use(
       console.log('📤 API Request:', {
         method: config.method?.toUpperCase(),
         url: config.url,
-        withCredentials: config.withCredentials, // ✅ Debug için
+        withCredentials: config.withCredentials,
+        cookies: document.cookie, 
       });
     }
     return config;
