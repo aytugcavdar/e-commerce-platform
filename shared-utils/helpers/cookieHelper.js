@@ -9,11 +9,11 @@ class CookieHelper {
     const isProduction = process.env.NODE_ENV === 'production';
     
     const defaultOptions = {
-      httpOnly: true,                    // ✅ JavaScript erişimini engelle
-      secure: isProduction,              // ✅ Production'da sadece HTTPS
-      sameSite: isProduction ? 'strict' : 'lax', // ✅ Dev'de 'lax' kullan
-      path: '/',                         // ✅ Tüm path'lerde geçerli
-      domain: undefined,                 // ✅ Domain belirtme (localhost için)
+      httpOnly: true,                   
+      secure: true,             
+      sameSite: 'none',
+      path: '/',                        
+      domain: undefined,                 
     };
     
     return { ...defaultOptions, ...customOptions };
