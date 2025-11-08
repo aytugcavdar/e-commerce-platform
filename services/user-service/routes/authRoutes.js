@@ -89,4 +89,6 @@ router.post(
   AuthController.resendVerificationEmail
 );
 
+router.get('/me', AuthMiddleware.verifyToken, AuthController.getCurrentUser);
+
 module.exports = router;

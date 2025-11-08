@@ -3,93 +3,44 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AuthState, User } from '../types/auth.types';
-import { env } from '@/config/env';
 import { loginUser, registerUser, logoutUser, verifyEmail } from './authThunks';
 
 /**
- * 🔧 TOKEN DOĞRULAMA HELPER
+ * 🎓 ÖĞREN: Cookie-Based Authentication
  * 
- * JWT token'ın süresi dolmuş mu kontrol eder.
+ * ❌ ÖNCE (localStorage):
+ * - Token'ları localStorage'da saklıyorduk
+ * - XSS saldırılarına karşı savunmasız
+ * - Her istekte manuel ekleme gerekiyordu
+ * 
+ * ✅ ŞIMDI (Cookie):
+ * - Token'lar HttpOnly cookie'lerde saklanıyor (Backend tarafından)
+ * - XSS saldırılarına karşı korumalı
+ * - Tarayıcı otomatik olarak her istekte gönderiyor
+ * - CSRF koruması için SameSite attribute kullanılıyor
+ * 
+ * 🔥 ÖNEMLİ:
+ * Frontend'de artık TOKEN SAKLAMIYORUZ!
+ * Sadece kullanıcı bilgilerini (user) ve auth durumunu (isAuthenticated) tutuyoruz.
  */
-const isTokenExpired = (token: string | null): boolean => {
-  if (!token) return true;
-  
-  // 🔥 DÜZELTME: Token'ın geçerli bir JWT formatında (en az 2 nokta) olup olmadığını kontrol et.
-  const parts = token.split('.');
-  if (parts.length < 3) {
-    console.error('❌ Token formatı hatalı (nokta sayısı eksik)');
-    return true;
-  }
-  
-  try {
-    // JWT token'ı decode et (payload kısmı)
-    const base64Url = parts[1]; // Düzeltildi
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    
-    // ... (kodun geri kalanı aynı)
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    
-    const payload = JSON.parse(jsonPayload);
-    
-    // Token'ın exp (expiration) alanını kontrol et
-    if (!payload.exp) return true;
-    
-    // Şu anki zaman (saniye cinsinden)
-    const currentTime = Math.floor(Date.now() / 1000);
-    
-    // Token süresi dolmuş mu?
-    return payload.exp < currentTime;
-  } catch (error) {
-    console.error('Token decode hatası:', error);
-    return true;
-  }
-};
 
 /**
- * 🏁 INITIAL STATE - Başlangıç Durumu
+ * 🏁 INITIAL STATE
  * 
- * Redux Persist'ten state yüklendiğinde token kontrolü yap.
+ * Artık token ve refreshToken yok!
+ * Cookie'ler backend tarafından yönetiliyor.
  */
-const getInitialState = (): AuthState => {
-  // LocalStorage'dan token al
-  const token = localStorage.getItem(env.tokenKey);
-  const userStr = localStorage.getItem('persist:root');
-  
-  // Token varsa ve geçerliyse authenticated tut
-  if (token && !isTokenExpired(token)) {
-    return {
-      user: null, // User Redux persist'ten yüklenecek
-      token,
-      refreshToken: localStorage.getItem(env.refreshTokenKey),
-      isAuthenticated: true,
-      loading: false,
-      error: null,
-      isLoggingIn: false,
-      isRegistering: false,
-      isLoggingOut: false,
-    };
-  }
-  
-  // Token yoksa veya süresi dolmuşsa temiz state
-  return {
-    user: null,
-    token: null,
-    refreshToken: null,
-    isAuthenticated: false,
-    loading: false,
-    error: null,
-    isLoggingIn: false,
-    isRegistering: false,
-    isLoggingOut: false,
-  };
+const initialState: AuthState = {
+  user: null,                    // Kullanıcı bilgileri (Redux Persist'te saklanacak)
+  token: null,                   // ❌ KALDIRILDI - Cookie'de saklanıyor
+  refreshToken: null,            // ❌ KALDIRILDI - Cookie'de saklanıyor
+  isAuthenticated: false,        // Giriş yapılmış mı?
+  loading: false,                // API isteği devam ediyor mu?
+  error: null,                   // Hata mesajı
+  isLoggingIn: false,            // Login isteği yapılıyor mu?
+  isRegistering: false,          // Register isteği yapılıyor mu?
+  isLoggingOut: false,           // Logout isteği yapılıyor mu?
 };
-
-const initialState: AuthState = getInitialState();
 
 /**
  * 🎯 AUTH SLICE
@@ -99,69 +50,48 @@ const authSlice = createSlice({
   initialState,
   
   reducers: {
+    /**
+     * 👤 SET USER
+     * Kullanıcı bilgilerini günceller
+     */
     setUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
       state.isAuthenticated = true;
     },
     
-    setToken: (state, action: PayloadAction<{ token: string; refreshToken: string }>) => {
-      // Token süresi dolmamışsa kaydet
-      if (!isTokenExpired(action.payload.token)) {
-        state.token = action.payload.token;
-        state.refreshToken = action.payload.refreshToken;
-        
-        localStorage.setItem(env.tokenKey, action.payload.token);
-        localStorage.setItem(env.refreshTokenKey, action.payload.refreshToken);
-      } else {
-        // Token süresi dolmuşsa temizle
-        console.warn('⚠️ Token süresi dolmuş, temizleniyor...');
-        state.token = null;
-        state.refreshToken = null;
-        state.isAuthenticated = false;
-        
-        localStorage.removeItem(env.tokenKey);
-        localStorage.removeItem(env.refreshTokenKey);
-      }
-    },
-    
+    /**
+     * ❌ CLEAR ERROR
+     * Hata mesajını temizler
+     */
     clearError: (state) => {
       state.error = null;
     },
     
+    /**
+     * 🚪 LOGOUT
+     * Kullanıcıyı çıkış yapar (cookie'ler backend tarafından temizlenecek)
+     */
     logout: (state) => {
       state.user = null;
-      state.token = null;
-      state.refreshToken = null;
       state.isAuthenticated = false;
       state.error = null;
-      
-      localStorage.removeItem(env.tokenKey);
-      localStorage.removeItem(env.refreshTokenKey);
     },
     
     /**
-     * 🆕 CHECK TOKEN VALIDITY
-     * 
-     * Uygulama başlatıldığında token'ı kontrol et.
-     * Süre dolmuşsa logout yap.
+     * 🔍 CHECK AUTH
+     * Sayfa yüklendiğinde auth durumunu kontrol et
+     * Backend'den /auth/check endpoint'i ile kullanıcı bilgisi alınacak
      */
-    checkTokenValidity: (state) => {
-      if (state.token && isTokenExpired(state.token)) {
-        console.warn('⚠️ Token süresi dolmuş, kullanıcı çıkartılıyor...');
-        state.user = null;
-        state.token = null;
-        state.refreshToken = null;
-        state.isAuthenticated = false;
-        state.error = 'Oturumunuz sona erdi. Lütfen tekrar giriş yapın.';
-        
-        localStorage.removeItem(env.tokenKey);
-        localStorage.removeItem(env.refreshTokenKey);
-      }
+    setAuthStatus: (state, action: PayloadAction<{ user: User | null; isAuthenticated: boolean }>) => {
+      state.user = action.payload.user;
+      state.isAuthenticated = action.payload.isAuthenticated;
     },
   },
   
   extraReducers: (builder) => {
+    // ==========================================
     // LOGIN USER
+    // ==========================================
     builder
       .addCase(loginUser.pending, (state) => {
         state.isLoggingIn = true;
@@ -172,13 +102,11 @@ const authSlice = createSlice({
         state.isLoggingIn = false;
         state.loading = false;
         state.user = action.payload.user;
-        state.token = action.payload.token;
-        state.refreshToken = action.payload.refreshToken;
         state.isAuthenticated = true;
         state.error = null;
         
-        localStorage.setItem(env.tokenKey, action.payload.token);
-        localStorage.setItem(env.refreshTokenKey, action.payload.refreshToken);
+        // ✅ Cookie'ler backend tarafından set edildi (Set-Cookie header ile)
+        // Frontend'de token saklamaya gerek yok!
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoggingIn = false;
@@ -186,7 +114,9 @@ const authSlice = createSlice({
         state.error = action.payload as string || 'Giriş yapılırken bir hata oluştu';
       });
     
+    // ==========================================
     // REGISTER USER
+    // ==========================================
     builder
       .addCase(registerUser.pending, (state) => {
         state.isRegistering = true;
@@ -197,7 +127,7 @@ const authSlice = createSlice({
         state.isRegistering = false;
         state.loading = false;
         state.user = action.payload.user;
-        state.isAuthenticated = false;
+        state.isAuthenticated = false; // E-posta doğrulama gerekiyor
         state.error = null;
       })
       .addCase(registerUser.rejected, (state, action) => {
@@ -206,19 +136,25 @@ const authSlice = createSlice({
         state.error = action.payload as string || 'Kayıt olurken bir hata oluştu';
       });
     
+    // ==========================================
     // LOGOUT USER
+    // ==========================================
     builder
       .addCase(logoutUser.pending, (state) => {
         state.isLoggingOut = true;
       })
       .addCase(logoutUser.fulfilled, (state) => {
+        // Tüm state'i temizle
         return { ...initialState, isLoggingOut: false };
       })
       .addCase(logoutUser.rejected, (state) => {
+        // Hata olsa bile çıkış yap
         return { ...initialState, isLoggingOut: false };
       });
     
+    // ==========================================
     // VERIFY EMAIL
+    // ==========================================
     builder
       .addCase(verifyEmail.pending, (state) => {
         state.loading = true;
@@ -237,22 +173,24 @@ const authSlice = createSlice({
   },
 });
 
-export const { setUser, setToken, clearError, logout, checkTokenValidity } = authSlice.actions;
+export const { setUser, clearError, logout, setAuthStatus } = authSlice.actions;
 
 export default authSlice.reducer;
 
 /**
- * 💡 KULLANIM ÖRNEĞİ (App.tsx veya index.tsx):
+ * 🎯 KULLANIM ÖRNEĞİ:
  * 
+ * // App.tsx - Sayfa yüklendiğinde auth durumunu kontrol et
+ * import { useEffect } from 'react';
  * import { useAppDispatch } from '@/app/hooks';
- * import { checkTokenValidity } from '@/features/auth/store/authSlice';
+ * import { checkAuth } from '@/features/auth/store/authThunks';
  * 
  * function App() {
  *   const dispatch = useAppDispatch();
  *   
  *   useEffect(() => {
- *     // Uygulama başlatıldığında token'ı kontrol et
- *     dispatch(checkTokenValidity());
+ *     // Backend'e istek at, cookie geçerliyse kullanıcı bilgilerini al
+ *     dispatch(checkAuth());
  *   }, [dispatch]);
  *   
  *   return <AppRoutes />;
@@ -260,21 +198,50 @@ export default authSlice.reducer;
  */
 
 /**
- * 🔥 BEST PRACTICE: Token Refresh
+ * 💡 PRO TIP: Cookie vs localStorage
  * 
- * Token süresi dolmadan önce yenile (5 dakika kala):
+ * ┌─────────────────┬──────────────┬──────────────┐
+ * │                 │ localStorage │ Cookie       │
+ * ├─────────────────┼──────────────┼──────────────┤
+ * │ XSS Güvenliği   │ ❌ Savunmasız │ ✅ HttpOnly   │
+ * │ CSRF Güvenliği  │ ✅ İmmune     │ ⚠️ SameSite  │
+ * │ Otomatik Gönder │ ❌ Manuel     │ ✅ Otomatik   │
+ * │ Boyut Limiti    │ ~5-10MB      │ ~4KB         │
+ * │ Erişim          │ JS ile       │ Backend      │
+ * └─────────────────┴──────────────┴──────────────┘
  * 
- * const REFRESH_BEFORE_EXPIRY = 5 * 60 * 1000; // 5 dakika
+ * 🔥 BEST PRACTICE:
+ * - Access Token: HttpOnly Cookie (XSS'den korunur)
+ * - Refresh Token: HttpOnly Cookie (XSS'den korunur)
+ * - User Data: Redux State (Redux Persist ile localStorage'da - hassas veri yok)
+ */
+
+/**
+ * 🔥 CSRF (Cross-Site Request Forgery) Koruması:
  * 
- * setInterval(() => {
- *   const token = localStorage.getItem(env.tokenKey);
- *   if (token && !isTokenExpired(token)) {
- *     const payload = JSON.parse(atob(token.split('.')[1]));
- *     const expiresIn = (payload.exp * 1000) - Date.now();
- *     
- *     if (expiresIn < REFRESH_BEFORE_EXPIRY) {
- *       dispatch(refreshToken());
- *     }
- *   }
- * }, 60000); // Her dakika kontrol et
+ * Backend'de cookie ayarları:
+ * - httpOnly: true (JavaScript erişimini engelle)
+ * - secure: true (Sadece HTTPS ile gönder - production'da)
+ * - sameSite: 'strict' veya 'lax' (CSRF saldırılarını engelle)
+ * 
+ * Frontend'de yapılacak:
+ * - axios.defaults.withCredentials = true (Cookie'leri otomatik gönder)
+ */
+
+/**
+ * 🎓 ÖĞREN: Redux Persist ile Cookie-Based Auth
+ * 
+ * Redux Persist sadece kullanıcı bilgilerini saklar:
+ * - user: { id, email, firstName, ... }
+ * - isAuthenticated: true
+ * 
+ * Token'lar backend tarafından cookie'lerde saklanır:
+ * - accessToken (HttpOnly)
+ * - refreshToken (HttpOnly)
+ * 
+ * Sayfa yenilendiğinde:
+ * 1. Redux Persist'ten user bilgisi yüklenir
+ * 2. Backend'e checkAuth() isteği atılır (cookie otomatik gönderilir)
+ * 3. Cookie geçerliyse -> isAuthenticated: true
+ * 4. Cookie geçersizse -> logout() çağrılır
  */

@@ -14,62 +14,47 @@ import type {
 } from '../types/auth.types';
 
 /**
- * 🎓 ÖĞREN: Redux Thunk Nedir?
+ * 🎓 ÖĞREN: Cookie-Based Thunks
  * 
- * Thunk, async (asenkron) işlemler için kullanılır.
- * API çağrıları, veritabanı işlemleri gibi.
- * 
- * Neden Thunk?
- * - Reducer'lar senkrondur, async işlem yapamazlar
- * - API çağrısı yapmak için async/await gerekir
- * - Thunk bu sorunu çözer
- * 
- * createAsyncThunk() 3 action oluşturur:
- * - pending: İşlem başladı (loading: true)
- * - fulfilled: İşlem başarılı (data ile)
- * - rejected: İşlem başarısız (error ile)
- * 
- * Örnek:
- * dispatch(loginUser(credentials))
- * 1. loginUser.pending -> isLoggingIn: true
- * 2. API çağrısı yapılır
- * 3. loginUser.fulfilled -> user set edilir
+ * Değişiklikler:
+ * 1. ❌ Token'ları artık localStorage'a kaydetmiyoruz
+ * 2. ✅ Backend otomatik olarak Set-Cookie header'ı gönderiyor
+ * 3. ✅ axios.defaults.withCredentials = true sayesinde cookie'ler otomatik gönderiliyor
+ * 4. 🆕 checkAuth() thunk'u eklendi (sayfa yüklendiğinde auth kontrolü)
  */
 
 /**
  * 🔐 LOGIN USER - Kullanıcı Girişi
  * 
- * E-posta ve şifre ile giriş yapar.
- * Başarılı olursa kullanıcı bilgileri ve token'lar döner.
+ * Backend'den gelen cevap:
+ * {
+ *   success: true,
+ *   message: "Giriş başarılı",
+ *   data: {
+ *     user: {...}
+ *     // ❌ token ve refreshToken artık yok (cookie'lerde)
+ *   }
+ * }
  * 
- * @param credentials - Email ve password
- * @returns User, token, refreshToken
+ * + Set-Cookie header'ında:
+ * - accessToken (HttpOnly, Secure, SameSite=Strict)
+ * - refreshToken (HttpOnly, Secure, SameSite=Strict)
  */
 export const loginUser = createAsyncThunk(
-  'auth/login',                   // Action tipi (otomatik: auth/login/pending, fulfilled, rejected)
+  'auth/login',
   async (credentials: LoginRequest, { rejectWithValue }) => {
     try {
-      // API çağrısı yap
       const { data } = await apiClient.post<LoginResponse>(
         AUTH_ENDPOINTS.LOGIN,
         credentials
       );
       
-      // Backend'den gelen cevap yapısı:
-      // {
-      //   success: true,
-      //   message: "Giriş başarılı",
-      //   data: {
-      //     user: {...},
-      //     token: "eyJhbG...",
-      //     refreshToken: "eyJhbG..."
-      //   }
-      // }
+      // ✅ Cookie'ler otomatik olarak tarayıcı tarafından saklandı!
+      // ✅ Bir sonraki isteklerde otomatik olarak gönderilecek!
       
-      return data.data; // user, token, refreshToken
+      return data.data; // Sadece user bilgisi
       
     } catch (error: any) {
-      // Hata yönetimi
       const message = 
         error.response?.data?.message || 
         error.message || 
@@ -83,17 +68,13 @@ export const loginUser = createAsyncThunk(
 /**
  * 📝 REGISTER USER - Kullanıcı Kaydı
  * 
- * Yeni kullanıcı oluşturur.
  * E-posta doğrulama linki gönderilir.
- * 
- * @param userData - Kayıt bilgileri
- * @returns Oluşturulan kullanıcı
+ * Kayıt sonrası otomatik giriş yapılmaz.
  */
 export const registerUser = createAsyncThunk(
   'auth/register',
   async (userData: RegisterRequest, { rejectWithValue }) => {
     try {
-      // FormData oluştur (avatar upload için)
       const formData = new FormData();
       formData.append('firstName', userData.firstName);
       formData.append('lastName', userData.lastName);
@@ -108,13 +89,12 @@ export const registerUser = createAsyncThunk(
         formData.append('avatar', userData.avatar);
       }
       
-      // API çağrısı yap
       const { data } = await apiClient.post<RegisterResponse>(
         AUTH_ENDPOINTS.REGISTER,
         formData,
         {
           headers: {
-            'Content-Type': 'multipart/form-data', // Dosya upload için
+            'Content-Type': 'multipart/form-data',
           },
         }
       );
@@ -135,27 +115,22 @@ export const registerUser = createAsyncThunk(
 /**
  * 🚪 LOGOUT USER - Çıkış Yap
  * 
- * Kullanıcıyı çıkış yapar.
- * Backend'e logout isteği gönderir (refresh token'ı iptal eder).
- * 
- * @returns void
+ * Backend'e logout isteği gönderir.
+ * Backend cookie'leri temizler (Set-Cookie ile boş değer gönderir).
  */
 export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { rejectWithValue }) => {
     try {
-      // API çağrısı yap (opsiyonel)
       await apiClient.post(AUTH_ENDPOINTS.LOGOUT);
       
-      // Token'ları localStorage'dan sil
-      localStorage.clear(); // Tüm storage'ı temizle
+      // ✅ Backend cookie'leri temizledi (expires=Thu, 01 Jan 1970)
+      // ❌ Frontend'de localStorage.clear() yapmaya gerek yok
       
       return;
       
     } catch (error: any) {
       // Hata olsa bile çıkış yap (frontend tarafında)
-      localStorage.clear();
-      
       const message = 
         error.response?.data?.message || 
         'Çıkış yapılırken bir hata oluştu';
@@ -167,23 +142,15 @@ export const logoutUser = createAsyncThunk(
 
 /**
  * ✅ VERIFY EMAIL - E-posta Doğrula
- * 
- * E-posta doğrulama linkine tıklandığında çağrılır.
- * Token'ı backend'e gönderir, e-posta doğrulanır.
- * 
- * @param verifyData - Token ve email
- * @returns void
  */
 export const verifyEmail = createAsyncThunk(
   'auth/verifyEmail',
   async (verifyData: VerifyEmailRequest, { rejectWithValue }) => {
     try {
-      // API çağrısı yap (GET request, query params)
       const { data } = await apiClient.get(AUTH_ENDPOINTS.VERIFY_EMAIL, {
         params: {
           token: verifyData.token,
         },
-        
       });
       
       return data;
@@ -200,12 +167,6 @@ export const verifyEmail = createAsyncThunk(
 
 /**
  * 🔄 RESEND VERIFICATION EMAIL - Doğrulama E-postasını Tekrar Gönder
- * 
- * E-posta doğrulama linki süresi dolduysa veya gelmemişse
- * yeniden gönderir.
- * 
- * @param email - E-posta adresi
- * @returns void
  */
 export const resendVerificationEmail = createAsyncThunk(
   'auth/resendVerificationEmail',
@@ -229,11 +190,6 @@ export const resendVerificationEmail = createAsyncThunk(
 
 /**
  * 🔑 FORGOT PASSWORD - Şifremi Unuttum
- * 
- * Şifre sıfırlama linki e-postaya gönderilir.
- * 
- * @param forgotData - E-posta
- * @returns void
  */
 export const forgotPassword = createAsyncThunk(
   'auth/forgotPassword',
@@ -258,12 +214,6 @@ export const forgotPassword = createAsyncThunk(
 
 /**
  * 🔄 RESET PASSWORD - Şifre Sıfırla
- * 
- * Şifre sıfırlama linkine tıklandığında,
- * yeni şifre ile güncelleme yapar.
- * 
- * @param resetData - Token, email, yeni şifre
- * @returns void
  */
 export const resetPassword = createAsyncThunk(
   'auth/resetPassword',
@@ -295,29 +245,46 @@ export const resetPassword = createAsyncThunk(
 );
 
 /**
- * 🔄 REFRESH TOKEN - Token Yenile
+ * 🆕 CHECK AUTH - Auth Durumunu Kontrol Et
  * 
- * Access token süresi dolduğunda,
- * refresh token ile yeni token alır.
+ * Sayfa yüklendiğinde çağrılır.
+ * Cookie'deki token'ı backend'e gönderir (otomatik).
+ * Backend token'ı doğrular ve kullanıcı bilgilerini döndürür.
  * 
- * @returns Yeni token'lar
+ * Backend endpoint: GET /api/auth/me
+ * 
+ * Başarılı cevap:
+ * {
+ *   success: true,
+ *   data: {
+ *     user: { id, email, firstName, ... }
+ *   }
+ * }
+ * 
+ * Başarısız cevap (401):
+ * {
+ *   success: false,
+ *   message: "Unauthorized"
+ * }
  */
-export const refreshToken = createAsyncThunk(
-  'auth/refreshToken',
+export const checkAuth = createAsyncThunk(
+  'auth/checkAuth',
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await apiClient.post(AUTH_ENDPOINTS.REFRESH_TOKEN);
+      // Backend'e istek at (cookie otomatik gönderilir)
+      const { data } = await apiClient.get('/auth/me');
       
-      return data.data; // token, refreshToken
+      return data.data; // { user }
       
     } catch (error: any) {
+      // 401 Unauthorized -> Token geçersiz, logout yap
+      if (error.response?.status === 401) {
+        return rejectWithValue('Unauthorized');
+      }
+      
       const message = 
         error.response?.data?.message || 
-        'Token yenilenemedi';
-      
-      // Token yenileme başarısız -> Logout yap
-      localStorage.clear();
-      window.location.href = '/login';
+        'Auth kontrolü başarısız';
       
       return rejectWithValue(message);
     }
@@ -325,66 +292,76 @@ export const refreshToken = createAsyncThunk(
 );
 
 /**
- * 🎯 KULLANIM ÖRNEKLERİ:
+ * 🎯 KULLANIM ÖRNEĞİ:
  * 
- * // Component içinde:
+ * // App.tsx
+ * import { useEffect } from 'react';
  * import { useAppDispatch } from '@/app/hooks';
- * import { loginUser, registerUser } from '@/features/auth/store/authThunks';
+ * import { checkAuth } from '@/features/auth/store/authThunks';
+ * import { setAuthStatus } from '@/features/auth/store/authSlice';
  * 
- * const LoginPage = () => {
+ * function App() {
  *   const dispatch = useAppDispatch();
  *   
- *   const handleLogin = async (credentials) => {
- *     // Thunk'ı dispatch et
- *     const result = await dispatch(loginUser(credentials));
+ *   useEffect(() => {
+ *     const verifyAuth = async () => {
+ *       try {
+ *         const result = await dispatch(checkAuth()).unwrap();
+ *         
+ *         // Başarılı -> Kullanıcı giriş yapmış
+ *         dispatch(setAuthStatus({
+ *           user: result.user,
+ *           isAuthenticated: true
+ *         }));
+ *         
+ *       } catch (error) {
+ *         // Başarısız -> Cookie geçersiz, logout yap
+ *         dispatch(setAuthStatus({
+ *           user: null,
+ *           isAuthenticated: false
+ *         }));
+ *       }
+ *     };
  *     
- *     // Sonucu kontrol et
- *     if (loginUser.fulfilled.match(result)) {
- *       // Başarılı
- *       toast.success('Giriş başarılı!');
- *       navigate('/');
- *     } else {
- *       // Başarısız
- *       toast.error(result.payload as string);
- *     }
- *   };
+ *     verifyAuth();
+ *   }, [dispatch]);
  *   
- *   return <LoginForm onSubmit={handleLogin} />;
- * };
- */
-
-/**
- * 💡 PRO TIP: Error Handling
- * 
- * Thunk'lar her zaman try-catch kullanmalı!
- * 
- * ✅ DOĞRU:
- * try {
- *   const { data } = await apiClient.post(...);
- *   return data;
- * } catch (error) {
- *   return rejectWithValue(error.message);
+ *   return <AppRoutes />;
  * }
- * 
- * ❌ YANLIŞ:
- * const { data } = await apiClient.post(...);
- * return data;
- * // Hata olursa? Uygulama çöker!
  */
 
 /**
- * 🔥 BEST PRACTICE: Loading States
+ * 💡 PRO TIP: Token Yenileme
  * 
- * Her thunk için ayrı loading state tutabilirsin:
+ * Backend'de refresh token mekanizması varsa:
  * 
- * isLoggingIn: loginUser.pending
- * isRegistering: registerUser.pending
- * isLoggingOut: logoutUser.pending
+ * 1. Access token süresi dolduğunda API 401 döner
+ * 2. Axios interceptor devreye girer
+ * 3. /api/auth/refresh-token endpoint'ine istek atılır (refresh token cookie'si gönderilir)
+ * 4. Backend yeni access token'ı Set-Cookie ile gönderir
+ * 5. Başarısız olan istek tekrar denenir
  * 
- * Bu sayede:
- * - Login butonu loading gösterir: isLoggingIn
- * - Register butonu loading gösterir: isRegistering
- * - Logout butonu loading gösterir: isLoggingOut
+ * Bu mekanizma shared/services/api/client.ts'de implement edilecek.
+ */
+
+/**
+ * 🔥 BEST PRACTICE: Error Handling
  * 
- * Aynı anda birden fazla işlem yapılabilir!
+ * Backend'den gelen hata tipleri:
+ * 
+ * 1. 401 Unauthorized:
+ *    - Token geçersiz veya süresi dolmuş
+ *    - Action: Logout yap, login sayfasına yönlendir
+ * 
+ * 2. 403 Forbidden:
+ *    - Token geçerli ama yetki yok
+ *    - Action: Yetkisiz erişim mesajı göster
+ * 
+ * 3. 400 Bad Request:
+ *    - Form validation hatası
+ *    - Action: Hata mesajını form'da göster
+ * 
+ * 4. 500 Internal Server Error:
+ *    - Backend hatası
+ *    - Action: Genel hata mesajı göster
  */

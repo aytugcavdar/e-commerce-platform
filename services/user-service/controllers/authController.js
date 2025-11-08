@@ -341,5 +341,43 @@ static refreshToken = asyncHandler(async (req, res) => {
     // Yeni tokenlar oluştur ve gönder
     CookieHelper.sendTokensResponse(res, user, ResponseFormatter);
   });
+    static getCurrentUser = asyncHandler(async (req, res) => {
+    // 1. Cookie'den access token'ı al
+    const accessToken = CookieHelper.getAccessTokenFromRequest(req);
+    
+    if (!accessToken) {
+      return res.status(httpStatus.UNAUTHORIZED).json(
+        ResponseFormatter.error('Access token bulunamadı', httpStatus.UNAUTHORIZED)
+      );
+    }
+
+    // 2. Token'ı doğrula
+    const decoded = TokenHelper.verifyToken(accessToken);
+    
+    if (!decoded || decoded.type !== 'access') {
+      return res.status(httpStatus.UNAUTHORIZED).json(
+        ResponseFormatter.error('Geçersiz access token', httpStatus.UNAUTHORIZED)
+      );
+    }
+
+    // 3. Kullanıcıyı veritabanından al
+    const user = await User.findById(decoded.userId);
+    
+    if (!user || !user.isActive) {
+      return res.status(httpStatus.UNAUTHORIZED).json(
+        ResponseFormatter.error('Kullanıcı bulunamadı veya aktif değil', httpStatus.UNAUTHORIZED)
+      );
+    }
+
+    // 4. Kullanıcı bilgilerini döndür
+    logger.info(`Kullanıcı bilgileri alındı: ${user.email}`);
+    
+    res.status(httpStatus.OK).json(
+      ResponseFormatter.success(
+        { user: user.toJSON() },
+        'Kullanıcı bilgileri başarıyla alındı'
+      )
+    );
+  });
 }
 module.exports = AuthController;
