@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const { httpStatus } = require("../constants");
-const { ResponseFormatter } = require("../helpers");
+const { ResponseFormatter,TokenHelper } = require("../helpers");
 const CookieHelper = require('../helpers/cookieHelper'); 
 class AuthMiddleware {
   static verifyToken(req, res, next) {
