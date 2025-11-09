@@ -10,19 +10,30 @@ import CartSummary from '@/features/cart/components/CartSummary';
 import { Container } from '@/shared/components/layout';
 import { Button, Input } from '@/shared/components/ui/base';
 import { Loading } from '@/shared/components/ui/feedback';
+// order.types.ts'den ShippingAddress ve PaymentMethodType'ı import ettiğimizi varsayıyoruz
+// (Bir önceki turda bu dosyanın içeriğini görmüştük)
 import type { ShippingAddress, PaymentMethodType } from '../types/order.types';
 
 /**
  * 🎓 ÖĞREN: CheckoutPage
- * 
- * Ödeme sayfası. Kullanıcı teslimat adresi ve ödeme yöntemi seçer.
- * 
- * Adımlar:
+ * * Ödeme sayfası. Kullanıcı teslimat adresi ve ödeme yöntemi seçer.
+ * * Adımlar:
  * 1. Teslimat Adresi
  * 2. Ödeme Yöntemi
  * 3. Sipariş Özeti
  * 4. Sipariş Oluştur
  */
+
+// Frontend'in state'i için arayüz (district içerebilir)
+interface CheckoutShippingAddress {
+  fullName: string;
+  phone: string;
+  address: string; // 'addressLine1' için
+  city: string;
+  district: string; // 'state' için
+  postalCode: string;
+  country: string;
+}
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -31,7 +42,7 @@ const CheckoutPage = () => {
   const { createNewOrder, creatingOrder } = useOrders();
 
   // Teslimat Adresi
-  const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
+  const [shippingAddress, setShippingAddress] = useState<CheckoutShippingAddress>({
     fullName: user?.firstName + ' ' + user?.lastName || '',
     phone: user?.phone || '',
     address: '',
@@ -81,6 +92,11 @@ const CheckoutPage = () => {
       toast.error('İlçe giriniz');
       return false;
     }
+    // DÜZELTME: Posta kodu validasyonu eklendi
+    if (!shippingAddress.postalCode.trim()) {
+      toast.error('Posta kodu giriniz');
+      return false;
+    }
     return true;
   };
 
@@ -92,16 +108,29 @@ const CheckoutPage = () => {
 
     if (!validateForm()) return;
 
-    // Sipariş verisini hazırla
+    // Sipariş verisini hazırla - DÜZELTİLMİŞ YAPI
     const orderData = {
+      // ÇÖZÜM 1: 'productId' -> 'product' olarak değiştirildi
       items: items.map(item => ({
-        productId: item.productId,
+        product: item.productId,
         quantity: item.quantity,
       })),
-      shippingAddress,
-      paymentMethod: {
-        type: paymentMethod,
+
+      // ÇÖZUM 2: Alan adları backend validasyonu ile eşleştirildi
+      shippingAddress: {
+        fullName: shippingAddress.fullName,
+        phone: shippingAddress.phone,
+        addressLine1: shippingAddress.address, // 'address' -> 'addressLine1'
+        addressLine2: '', // Opsiyonel alan
+        city: shippingAddress.city,
+        state: shippingAddress.district, // 'district' -> 'state'
+        postalCode: shippingAddress.postalCode,
+        country: shippingAddress.country,
       },
+
+      // ÇÖZÜM 3: Nesne yerine doğrudan string gönderildi
+      paymentMethod: paymentMethod,
+
       couponCode: coupon?.code,
       notes: notes.trim() || undefined,
     };
@@ -118,7 +147,9 @@ const CheckoutPage = () => {
       // Sipariş detay sayfasına yönlendir
       navigate(`/orders/${result.data._id}`);
     } else {
-      toast.error(result.error || 'Sipariş oluşturulamadı');
+      // DÜZELTME: Backend'den gelen validasyon hatasını göster
+      const errorMessage = result.error?.errors?.[0]?.message || result.error || 'Sipariş oluşturulamadı';
+      toast.error(errorMessage);
     }
   };
 
@@ -216,13 +247,14 @@ const CheckoutPage = () => {
                     />
 
                     <Input
-                      label="Posta Kodu"
+                      label="Posta Kodu *"
                       value={shippingAddress.postalCode}
                       onChange={(e) => setShippingAddress(prev => ({
                         ...prev,
                         postalCode: e.target.value
                       }))}
                       placeholder="34000"
+                      required // required eklendi
                       fullWidth
                     />
                   </div>
