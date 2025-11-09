@@ -91,4 +91,6 @@ router.post(
 
 router.get('/me', AuthMiddleware.verifyToken, AuthController.getCurrentUser);
 
+
+
 module.exports = router;

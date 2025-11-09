@@ -63,7 +63,7 @@ const AdminDashboardPage = () => {
         const ordersResponse = await apiClient.get('/orders/admin/all', {
           params: { limit: 5, sort: '-createdAt' }
         });
-        setRecentOrders(ordersResponse.data.data);
+        setRecentOrders(ordersResponse.data.data.orders);
         
       } catch (err: any) {
         setError(err.response?.data?.message || 'Veriler yüklenirken hata oluştu');

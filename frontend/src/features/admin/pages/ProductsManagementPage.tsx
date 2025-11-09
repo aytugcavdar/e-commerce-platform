@@ -96,8 +96,8 @@ const AdminProductsPage = () => {
       
       const response = await apiClient.get(PRODUCT_ENDPOINTS.LIST, { params });
       
-      setProducts(response.data.data);
-      setPagination(response.data.pagination);
+      setProducts(response.data.data.products);
+        setPagination(response.data.data.pagination);
       
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ürünler yüklenirken hata oluştu');

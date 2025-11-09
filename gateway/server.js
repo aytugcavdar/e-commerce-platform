@@ -184,6 +184,36 @@ const authServiceProxy = createProxyMiddleware({
 });
 app.use('/api/auth', authServiceProxy);
 
+
+const userServiceProxy = createProxyMiddleware({
+  target: process.env.USER_SERVICE_URL || 'http://user-service:5001', 
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/users': '/' // /api/users/admin/all -> /admin/all olarak çevir
+  },
+  // Cookie'leri bu rotada da ilet
+  cookieDomainRewrite: {
+    "*": "" 
+  },
+  cookiePathRewrite: {
+    "*": "/" 
+  },
+  onError: onProxyError,
+  onProxyReq: (proxyReq, req, res) => {
+    logger.info(`🚀 Proxying to User Service (Users): ${req.method} ${req.url}`);
+    
+    // Cookie'leri backend'e ilet
+    if (req.headers.cookie) {
+      proxyReq.setHeader('Cookie', req.headers.cookie);
+      logger.info(`🍪 Forwarding cookies to backend: ${req.headers.cookie.substring(0, 100)}...`);
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.info(`✅ User Service (Users) Response: ${proxyRes.statusCode}`);
+  }
+});
+app.use('/api/users', userServiceProxy);
+
 // Diğer proxy'ler (değişiklik yok)
 const productServiceProxy = createProxyMiddleware({
   target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',

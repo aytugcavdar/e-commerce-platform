@@ -70,7 +70,7 @@ const AdminOrdersPage = () => {
       if (searchQuery) params.search = searchQuery;
 
       const response = await apiClient.get(ORDER_ENDPOINTS.ADMIN_LIST, { params });
-      setOrders(response.data.data);
+      setOrders(response.data.data.orders);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Siparişler yüklenemedi');
     } finally {

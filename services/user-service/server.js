@@ -13,7 +13,7 @@ const {
 const { ErrorHandler } = middleware;
 const { CloudinaryHelper } = helpers;
 const authRoutes = require('./routes/authRoutes');
-
+const userRoutes = require('./routes/userRoutes');
 const app = express();
 
 CloudinaryHelper.init();
@@ -25,6 +25,7 @@ app.use(express.json());
 
 // Auth Routes
 app.use('/', authRoutes);
+app.use('/', userRoutes);
 
 // Hata yakalama middleware'i
 app.use(ErrorHandler.notFound);
