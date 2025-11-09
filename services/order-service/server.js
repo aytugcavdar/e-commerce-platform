@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 
 const {
   logger,
@@ -13,6 +14,7 @@ const { ErrorHandler } = middleware;
 const orderRoutes = require('./routes/orderRoutes');
 
 const app = express();
+app.use(cookieParser());
 
 // Middleware
 app.use(cors({

@@ -49,6 +49,10 @@ let failedQueue: Array<{
   reject: (reason?: any) => void;
 }> = [];
 
+// ✅ YENİ: Maksimum retry sayısı
+let refreshRetryCount = 0;
+const MAX_REFRESH_RETRIES = 1; // Sadece 1 kez dene
+
 const processQueue = (error: any = null) => {
   failedQueue.forEach(({ resolve, reject }) => {
     if (error) {
@@ -62,11 +66,13 @@ const processQueue = (error: any = null) => {
 
 apiClient.interceptors.response.use(
   (response) => {
+    // ✅ Başarılı istek, retry sayacını sıfırla
+    refreshRetryCount = 0;
+    
     if (env.isDevelopment) {
       console.log('📥 API Response:', {
         url: response.config.url,
         status: response.status,
-        // Cookie'leri logla
         cookies: document.cookie,
       });
     }
@@ -78,11 +84,14 @@ apiClient.interceptors.response.use(
     if (response?.status === 401) {
       // 🚫 1. Refresh token endpoint'ine istek atılıyorsa döngüye girme
       if (config?.url?.includes(AUTH_ENDPOINTS.REFRESH_TOKEN)) {
-        console.warn('⚠️ Refresh token geçersiz, logout yapılıyor');
+        console.error('❌ Refresh token geçersiz, logout yapılıyor');
         isRefreshing = false;
+        refreshRetryCount = 0; // ✅ Sıfırla
         processQueue(error);
         
-        // Redux store'u temizle ve login'e yönlendir
+        // Redux store'u temizle
+        window.dispatchEvent(new Event('auth:logout'));
+        
         window.location.href = '/login';
         return Promise.reject(error);
       }
@@ -93,37 +102,69 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // ✅ 3. Token yenileme işlemi devam ediyorsa kuyruğa ekle
+      // 🚫 3. Maksimum retry sayısına ulaşıldıysa döngüyü kır
+      if (refreshRetryCount >= MAX_REFRESH_RETRIES) {
+        console.error('❌ Token yenileme maksimum deneme sayısına ulaştı, logout yapılıyor');
+        isRefreshing = false;
+        refreshRetryCount = 0;
+        processQueue(error);
+        
+        window.dispatchEvent(new Event('auth:logout'));
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
+
+      // ✅ 4. Token yenileme işlemi devam ediyorsa kuyruğa ekle
       if (isRefreshing) {
+        console.log('⏳ Token yenileniyor, istek kuyruğa eklendi');
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
-          .then(() => apiClient(config!))
-          .catch((err) => Promise.reject(err));
+          .then(() => {
+            console.log('✅ Token yenilendi, istek tekrar deneniyor');
+            return apiClient(config!);
+          })
+          .catch((err) => {
+            console.error('❌ Kuyruktaki istek başarısız:', err);
+            return Promise.reject(err);
+          });
       }
 
-      // ✅ 4. Token yenileme işlemini başlat
+      // ✅ 5. Token yenileme işlemini başlat
       isRefreshing = true;
+      refreshRetryCount++; // ✅ Sayacı artır
 
       try {
-        console.log('🔄 Token yenileniyor...');
+        console.log(`🔄 Token yenileniyor (Deneme ${refreshRetryCount}/${MAX_REFRESH_RETRIES})...`);
+        console.log('🍪 Mevcut cookie\'ler:', document.cookie.substring(0, 100));
         
-        // ✅ withCredentials: true ile refresh token cookie'si gönderilir
-        await apiClient.post(AUTH_ENDPOINTS.REFRESH_TOKEN);
+        // ✅ Refresh token isteği
+        const refreshResponse = await apiClient.post(AUTH_ENDPOINTS.REFRESH_TOKEN);
         
-        console.log('✅ Token yenilendi');
+        console.log('✅ Token yenilendi, yeni cookie\'ler alındı');
+        console.log('🍪 Yeni cookie\'ler:', document.cookie.substring(0, 100));
         
         isRefreshing = false;
+        refreshRetryCount = 0; // ✅ Başarılı, sıfırla
         processQueue();
         
         // Başarısız olan isteği tekrar dene
+        console.log('🔄 Başarısız istek tekrar deneniyor:', config?.url);
         return apiClient(config!);
         
-      } catch (refreshError) {
-        console.error('❌ Token yenileme başarısız');
+      } catch (refreshError: any) {
+        console.error('❌ Token yenileme başarısız:', {
+          status: refreshError.response?.status,
+          message: refreshError.response?.data?.message,
+          cookies: document.cookie,
+        });
         
         isRefreshing = false;
+        refreshRetryCount = 0; // ✅ Sıfırla
         processQueue(refreshError);
+        
+        // Redux store'u temizle
+        window.dispatchEvent(new Event('auth:logout'));
         
         // Login sayfasına yönlendir
         window.location.href = '/login';
@@ -133,26 +174,6 @@ apiClient.interceptors.response.use(
     }
 
     // Diğer hatalar
-    if (response) {
-      switch (response.status) {
-        case 403:
-          console.warn('⚠️ 403 Forbidden');
-          break;
-        case 404:
-          console.warn('⚠️ 404 Not Found:', config?.url);
-          break;
-        case 500:
-        case 502:
-        case 503:
-          console.error('❌ Server Error:', response.status);
-          break;
-      }
-    } else if (error.code === 'ECONNABORTED') {
-      console.error('❌ Request Timeout');
-    } else if (error.message === 'Network Error') {
-      console.error('❌ Network Error');
-    }
-
     if (env.isDevelopment) {
       console.error('❌ API Error:', {
         url: config?.url,

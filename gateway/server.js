@@ -239,12 +239,32 @@ const orderServiceProxy = createProxyMiddleware({
   pathRewrite: {
     '^/api/orders': ''
   },
+  // ✅ YENİ: Cookie desteği ekle
+  cookieDomainRewrite: {
+    "*": ""
+  },
+  cookiePathRewrite: {
+    "*": "/"
+  },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {
-    logger.info(`Proxying to Order Service: ${req.method} ${req.url}`);
+    logger.info(`🚀 Proxying to Order Service: ${req.method} ${req.url}`);
+    
+    // ✅ Cookie'leri backend'e ilet
+    if (req.headers.cookie) {
+      proxyReq.setHeader('Cookie', req.headers.cookie);
+      logger.info(`🍪 Forwarding cookies to Order Service: ${req.headers.cookie.substring(0, 100)}...`);
+    } else {
+      logger.warn('⚠️ No cookies to forward to Order Service');
+    }
   },
   onProxyRes: (proxyRes, req, res) => {
-    logger.info(`Order Service Response: ${proxyRes.statusCode}`);
+    logger.info(`✅ Order Service Response: ${proxyRes.statusCode}`);
+    
+    const setCookieHeaders = proxyRes.headers['set-cookie'];
+    if (setCookieHeaders) {
+      logger.info(`🍪 Order Service sent ${setCookieHeaders.length} cookies`);
+    }
   }
 });
 app.use('/api/orders', orderServiceProxy);
