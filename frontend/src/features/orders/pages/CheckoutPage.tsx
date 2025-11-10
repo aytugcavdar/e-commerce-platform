@@ -72,86 +72,77 @@ const CheckoutPage = () => {
    * 📝 Form Validasyonu
    */
   const validateForm = (): boolean => {
-    if (!shippingAddress.fullName.trim()) {
-      toast.error('Ad Soyad giriniz');
-      return false;
-    }
-    if (!shippingAddress.phone.trim()) {
-      toast.error('Telefon numarası giriniz');
-      return false;
-    }
-    if (!shippingAddress.address.trim()) {
-      toast.error('Adres giriniz');
-      return false;
-    }
-    if (!shippingAddress.city.trim()) {
-      toast.error('İl seçiniz');
-      return false;
-    }
-    if (!shippingAddress.district.trim()) {
-      toast.error('İlçe giriniz');
-      return false;
-    }
-    // DÜZELTME: Posta kodu validasyonu eklendi
-    if (!shippingAddress.postalCode.trim()) {
-      toast.error('Posta kodu giriniz');
-      return false;
-    }
-    return true;
-  };
+  if (!shippingAddress.fullName.trim()) {
+    toast.error('Ad Soyad giriniz');
+    return false;
+  }
+  if (!shippingAddress.phone.trim()) {
+    toast.error('Telefon numarası giriniz');
+    return false;
+  }
+  if (!shippingAddress.address.trim()) {
+    toast.error('Adres giriniz');
+    return false;
+  }
+  if (!shippingAddress.city.trim()) {
+    toast.error('İl seçiniz');
+    return false;
+  }
+  if (!shippingAddress.district.trim()) {
+    toast.error('İlçe giriniz');
+    return false;
+  }
+  if (!shippingAddress.postalCode.trim()) {  // ✅ EKLENDİ
+    toast.error('Posta kodu giriniz');
+    return false;
+  }
+  return true;
+};
 
   /**
    * 🛒 Sipariş Oluştur
    */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (!validateForm()) return;
+  if (!validateForm()) return;
 
-    // Sipariş verisini hazırla - DÜZELTİLMİŞ YAPI
-    const orderData = {
-      // ÇÖZÜM 1: 'productId' -> 'product' olarak değiştirildi
-      items: items.map(item => ({
-        product: item.productId,
-        quantity: item.quantity,
-      })),
-
-      // ÇÖZUM 2: Alan adları backend validasyonu ile eşleştirildi
-      shippingAddress: {
-        fullName: shippingAddress.fullName,
-        phone: shippingAddress.phone,
-        addressLine1: shippingAddress.address, // 'address' -> 'addressLine1'
-        addressLine2: '', // Opsiyonel alan
-        city: shippingAddress.city,
-        state: shippingAddress.district, // 'district' -> 'state'
-        postalCode: shippingAddress.postalCode,
-        country: shippingAddress.country,
-      },
-
-      // ÇÖZÜM 3: Nesne yerine doğrudan string gönderildi
-      paymentMethod: paymentMethod,
-
-      couponCode: coupon?.code,
-      notes: notes.trim() || undefined,
-    };
-
-    // Sipariş oluştur
-    const result = await createNewOrder(orderData);
-
-    if (result.success) {
-      toast.success('Sipariş oluşturuldu! 🎉');
-      
-      // Sepeti temizle (opsiyonel, backend'de de temizlenebilir)
-      // clearCart();
-      
-      // Sipariş detay sayfasına yönlendir
-      navigate(`/orders/${result.data._id}`);
-    } else {
-      // DÜZELTME: Backend'den gelen validasyon hatasını göster
-      const errorMessage = result.error?.errors?.[0]?.message || result.error || 'Sipariş oluşturulamadı';
-      toast.error(errorMessage);
-    }
+  const orderData = {
+    items: items.map(item => ({
+      product: item.productId,
+      quantity: item.quantity,
+    })),
+    shippingAddress: {
+      fullName: shippingAddress.fullName,
+      phone: shippingAddress.phone,
+      addressLine1: shippingAddress.address,
+      addressLine2: '',
+      city: shippingAddress.city,
+      state: shippingAddress.district,
+      postalCode: shippingAddress.postalCode,
+      country: shippingAddress.country,
+    },
+    paymentMethod: paymentMethod,
+    couponCode: coupon?.code,
+    notes: notes.trim() || undefined,
   };
+
+  const result = await createNewOrder(orderData);
+
+  if (result.success) {
+    toast.success('Sipariş oluşturuldu! 🎉');
+    navigate(`/orders/${result.data._id}`);
+  } else {
+    // ✅ Backend'den gelen hata mesajını göster
+    const errorMessage = result.error?.message || 'Sipariş oluşturulamadı';
+    toast.error(errorMessage);
+    
+    // Stok hatası varsa detayları göster
+    if (result.error?.data?.unavailableItems) {
+      console.error('Stokta olmayan ürünler:', result.error.data.unavailableItems);
+    }
+  }
+};
 
   if (isEmpty) {
     return <Loading fullScreen message="Yönlendiriliyor..." />;

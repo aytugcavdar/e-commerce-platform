@@ -18,7 +18,7 @@ class OrderController {
   const {
     items,
     shippingAddress,
-    billingAddress,
+    billingAddress,  // ✅ Opsiyonel yap
     paymentMethod,
     notes,
     couponCode
@@ -26,27 +26,28 @@ class OrderController {
 
   const userId = req.user.userId;
 
+  // 1️⃣ Validation
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(httpStatus.BAD_REQUEST).json(
-      ResponseFormatter.error(errorMessages.EMPTY_CART || 'Sepet boş olamaz', httpStatus.BAD_REQUEST)
+      ResponseFormatter.error('Sepet boş olamaz', httpStatus.BAD_REQUEST)
     );
   }
 
   let enrichedItems = [];
   let subtotal = 0;
 
-  // 1️⃣ Product Service — Ürünleri doğrula ve fiyatları güncel al
+  // 2️⃣ Product Service - Ürünleri doğrula
   try {
     const productIds = items.map(item => item.product);
     logger.info(`[OrderService] Fetching products: ${productIds}`);
 
     const productResponse = await axios.post(
-      `${process.env.PRODUCT_SERVICE_URL}/api/products/products/bulk`,
+      `${process.env.PRODUCT_SERVICE_URL}/api/products/bulk`,
       { ids: productIds }
     );
 
     if (!productResponse.data?.success) {
-      throw new Error('Product service success = false');
+      throw new Error('Product service failed');
     }
 
     const products = productResponse.data.data;
@@ -70,27 +71,44 @@ class OrderController {
 
   } catch (error) {
     logger.error('Product validation failed:', error);
-    return next(new Error(errorMessages.PRODUCT_NOT_FOUND));
+    return next(new Error('Ürün doğrulama başarısız'));
   }
 
-  // 2️⃣ STOk Kontrolü
+  // 3️⃣ ✅ INVENTORY SERVICE - Stok Kontrolü (DÜZELTME)
   try {
+    logger.info('[OrderService] Checking stock with Inventory Service...');
+    
     const checkStockResponse = await axios.post(
-      `${process.env.PRODUCT_SERVICE_URL}/api/products/products/check-stock`,
-      { items: items.map(i => ({ productId: i.product, quantity: i.quantity })) }
+      `${process.env.INVENTORY_SERVICE_URL}/api/inventory/check-bulk`,  // ✅ Doğru URL
+      { 
+        items: items.map(i => ({ 
+          productId: i.product, 
+          quantity: i.quantity 
+        })) 
+      }
     );
 
-    if (!checkStockResponse.data?.data?.allAvailable) {
+    if (!checkStockResponse.data?.success || !checkStockResponse.data?.data?.allAvailable) {
+      logger.warn('[OrderService] Stock check failed:', checkStockResponse.data?.data?.unavailableItems);
       return res.status(httpStatus.BAD_REQUEST).json(
-        ResponseFormatter.error(errorMessages.INSUFFICIENT_STOCK, httpStatus.BAD_REQUEST)
+        ResponseFormatter.error(
+          'Yetersiz stok', 
+          httpStatus.BAD_REQUEST,
+          checkStockResponse.data?.data?.unavailableItems
+        )
       );
     }
+    
+    logger.info('[OrderService] ✅ Stock check passed');
+
   } catch (error) {
-    logger.error('Stock check failed:', error);
-    return next(new Error(errorMessages.SERVICE_UNAVAILABLE + ' (Product Stock Check)'));
+    logger.error('Stock check failed:', error.response?.data || error.message);
+    return res.status(httpStatus.SERVICE_UNAVAILABLE).json(
+      ResponseFormatter.error('Stok kontrol servisi kullanılamıyor', httpStatus.SERVICE_UNAVAILABLE)
+    );
   }
 
-  // 3️⃣ Toplam Hesapları
+  // 4️⃣ Fiyat Hesaplamaları
   let discountAmount = 0;
   let couponData = null;
 
@@ -102,7 +120,7 @@ class OrderController {
   const shippingCost = subtotal >= 200 ? 0 : 29.90;
   const total = subtotal + tax + shippingCost - discountAmount;
 
-  // 4️⃣ Siparişi DB’ye Kaydet
+  // 5️⃣ Siparişi Kaydet
   const order = new Order({
     user: userId,
     items: enrichedItems,
@@ -112,7 +130,7 @@ class OrderController {
     discount: discountAmount,
     total,
     shippingAddress,
-    billingAddress: billingAddress || shippingAddress,
+    billingAddress: billingAddress || shippingAddress,  // ✅ Yoksa shippingAddress kullan
     paymentMethod,
     notes,
     coupon: couponData,
@@ -123,45 +141,30 @@ class OrderController {
 
   try {
     const savedOrder = await order.save();
-    logger.info(`Order created: ${savedOrder._id}`);
+    logger.info(`✅ Order created: ${savedOrder._id}`);
 
-    // Event Dispatching
-    const stockPayload = {
+    // 6️⃣ Events
+    await publisher.publish('inventory.reserve', {
       orderId: savedOrder._id,
-      items: savedOrder.items.map(i => ({ productId: i.product, quantity: i.quantity }))
-    };
+      items: savedOrder.items.map(i => ({ 
+        productId: i.product, 
+        quantity: i.quantity 
+      }))
+    });
 
-    await publisher.publish('product.stock.decrease', stockPayload);
-    logger.info('Event published: product.stock.decrease');
-
-    const paymentPayload = {
+    await publisher.publish('payment.process', {
       orderId: savedOrder._id,
       userId: savedOrder.user,
       totalAmount: savedOrder.total,
       paymentMethod: savedOrder.paymentMethod
-    };
-
-    await publisher.publish('payment.process', paymentPayload);
-    logger.info('Event published: payment.process');
-
-    await publisher.publish('notification.order.created', {
-      orderId: savedOrder._id,
-      userEmail: req.user.email,
-      userName: req.user.firstName,
-      orderNumber: savedOrder.orderNumber,
-      total: savedOrder.total
     });
-
-    logger.info('Event published: notification.order.created');
-
-    await savedOrder.populate('user', 'firstName lastName email');
 
     return res
       .status(httpStatus.CREATED)
       .json(ResponseFormatter.success(savedOrder, 'Sipariş başarıyla oluşturuldu.'));
 
   } catch (error) {
-    logger.error('Order database save failed:', error);
+    logger.error('Order save failed:', error);
     return next(error);
   }
 });
