@@ -30,6 +30,13 @@ const upload = multer({
   },
 });
 
+
+router.post(
+  '/bulk',
+  RateLimitMiddleware.generalLimiter,
+  ProductController.getBulkProducts
+);
+
 // ===========================================
 // PUBLIC ROUTES
 // ===========================================
@@ -79,6 +86,9 @@ router.get(
   ValidationMiddleware.validateObjectId('id'),
   ProductController.getRelatedProducts
 );
+
+
+
 
 // ===========================================
 // PROTECTED ROUTES (Admin only)

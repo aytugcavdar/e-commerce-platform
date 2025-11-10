@@ -729,6 +729,60 @@ class ProductController {
       ResponseFormatter.success(relatedProducts, 'İlgili ürünler getirildi')
     );
   });
+  static getBulkProducts = asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(httpStatus.BAD_REQUEST).json(
+      ResponseFormatter.error('Ürün ID listesi gerekli', httpStatus.BAD_REQUEST)
+    );
+  }
+
+  // ObjectId formatını kontrol et
+  const ObjectId = require('mongoose').Types.ObjectId;
+  const validIds = ids.filter(id => ObjectId.isValid(id));
+
+  if (validIds.length === 0) {
+    return res.status(httpStatus.BAD_REQUEST).json(
+      ResponseFormatter.error('Geçerli ürün ID\'si bulunamadı', httpStatus.BAD_REQUEST)
+    );
+  }
+
+  try {
+    const products = await Product.find({ 
+      _id: { $in: validIds },
+      status: 'active'  // Sadece aktif ürünleri getir
+    })
+    .select('_id name price discountPrice images stock status')  // Sadece gerekli alanlar
+    .lean();
+
+    if (products.length === 0) {
+      return res.status(httpStatus.NOT_FOUND).json(
+        ResponseFormatter.error('Ürün bulunamadı', httpStatus.NOT_FOUND)
+      );
+    }
+
+    // Bulunamayan ID'leri logla
+    const foundIds = products.map(p => p._id.toString());
+    const notFoundIds = validIds.filter(id => !foundIds.includes(id.toString()));
+    
+    if (notFoundIds.length > 0) {
+      logger.warn(`Some products not found: ${notFoundIds.join(', ')}`);
+    }
+
+    logger.info(`✅ Bulk products fetched: ${products.length} products`);
+
+    return res.status(httpStatus.OK).json(
+      ResponseFormatter.success(products, 'Ürünler getirildi')
+    );
+
+  } catch (error) {
+    logger.error('Bulk products fetch failed:', error);
+    return res.status(httpStatus.INTERNAL_SERVER_ERROR).json(
+      ResponseFormatter.error('Ürünler getirilemedi', httpStatus.INTERNAL_SERVER_ERROR)
+    );
+  }
+});
 }
 
 module.exports = ProductController;

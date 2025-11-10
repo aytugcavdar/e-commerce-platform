@@ -38,41 +38,70 @@ class OrderController {
 
   // 2️⃣ Product Service - Ürünleri doğrula
   try {
-    const productIds = items.map(item => item.product);
-    logger.info(`[OrderService] Fetching products: ${productIds}`);
+  const productIds = items.map(item => item.product);
+  logger.info(`[OrderService] Fetching products: ${productIds}`);
 
-    const productResponse = await axios.post(
-      `${process.env.PRODUCT_SERVICE_URL}/api/products/bulk`,
-      { ids: productIds }
-    );
+  const productResponse = await axios.post(
+    `${process.env.PRODUCT_SERVICE_URL}/api/products/bulk`,  // ✅ Doğru URL
+    { ids: productIds },
+    {
+      timeout: 5000,  // 5 saniye timeout
+      headers: { 'Content-Type': 'application/json' }
+    }
+  );
 
-    if (!productResponse.data?.success) {
-      throw new Error('Product service failed');
+  logger.info('[OrderService] Product response:', productResponse.data);
+
+  if (!productResponse.data?.success) {
+    throw new Error('Product service returned unsuccessful response');
+  }
+
+  const products = productResponse.data.data;
+
+  if (!products || products.length === 0) {
+    throw new Error('No products found');
+  }
+
+  enrichedItems = items.map(item => {
+    const product = products.find(p => p._id.toString() === item.product.toString());
+    
+    if (!product) {
+      throw new Error(`Product not found: ${item.product}`);
     }
 
-    const products = productResponse.data.data;
+    if (product.status !== 'active') {
+      throw new Error(`Product is not active: ${product.name}`);
+    }
 
-    enrichedItems = items.map(item => {
-      const product = products.find(p => p._id.toString() === item.product.toString());
-      if (!product) throw new Error(`Product not found: ${item.product}`);
+    const currentPrice = product.discountPrice ?? product.price;
+    subtotal += currentPrice * item.quantity;
 
-      const currentPrice = product.discountPrice ?? product.price;
-      subtotal += currentPrice * item.quantity;
+    return {
+      product: product._id,
+      name: product.name,
+      quantity: item.quantity,
+      price: product.price,
+      discountPrice: product.discountPrice,
+      image: product.images?.[0]?.url || '',
+    };
+  });
 
-      return {
-        product: product._id,
-        name: product.name,
-        quantity: item.quantity,
-        price: product.price,
-        discountPrice: product.discountPrice,
-        image: product.images?.[0]?.url || '',
-      };
-    });
+  logger.info(`[OrderService] ✅ Products validated. Subtotal: ${subtotal}`);
 
-  } catch (error) {
-    logger.error('Product validation failed:', error);
-    return next(new Error('Ürün doğrulama başarısız'));
-  }
+} catch (error) {
+  logger.error('[OrderService] Product validation failed:', {
+    message: error.message,
+    response: error.response?.data,
+    status: error.response?.status
+  });
+  
+  return res.status(httpStatus.BAD_REQUEST).json(
+    ResponseFormatter.error(
+      error.message || 'Ürün doğrulama başarısız',
+      httpStatus.BAD_REQUEST
+    )
+  );
+}
 
   // 3️⃣ ✅ INVENTORY SERVICE - Stok Kontrolü (DÜZELTME)
   try {
