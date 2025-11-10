@@ -41,7 +41,7 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/products', productRoutes);   
+app.use('/', productRoutes);   
 app.use('/', categoryRoutes); 
 app.use('/', brandRoutes);
 
