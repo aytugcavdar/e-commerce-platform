@@ -54,16 +54,15 @@ class InventoryController {
     }
 
     if (!allAvailable) {
-        logger.warn('Stock check failed for one or more items.', { unavailableItems });
-        // Başarısız cevabı, stokta olmayan ürün detaylarıyla birlikte döndürelim.
-        return res.status(httpStatus.BAD_REQUEST).json(
-            ResponseFormatter.error(
-                errorMessages.INSUFFICIENT_STOCK || 'Stok yetersiz.',
-                httpStatus.BAD_REQUEST,
-                { allAvailable: false, unavailableItems }
-            )
-        );
-    }
+  // ✅ DÜZELTME: Stok olmasa bile 200 OK dön, 
+  // order-service'in try bloğu çalışsın, catch bloğu değil.
+  return res.status(httpStatus.OK).json( 
+    ResponseFormatter.success(
+      { allAvailable: false, unavailableItems },
+      'Stokta olmayan ürünler var'
+    )
+  );
+}
 
     // Her şey yolundaysa başarılı cevap dön
     logger.info('Stock check successful for all items.');

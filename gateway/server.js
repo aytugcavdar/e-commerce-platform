@@ -219,7 +219,7 @@ const productServiceProxy = createProxyMiddleware({
   target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/products': '/api/products/products' 
+    '^/api/products': '/api/products' 
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {

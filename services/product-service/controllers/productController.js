@@ -4,6 +4,7 @@ const {
   middleware: { asyncHandler },
   helpers: { ResponseFormatter, CloudinaryHelper },
   constants: { httpStatus, errorMessages },
+  rabbitmq: { publisher },
   logger,
 } = require("@ecommerce/shared-utils");
 
@@ -235,7 +236,21 @@ class ProductController {
     });
     try {
       await product.save();
-
+      try {
+      const inventoryPayload = {
+        orderId: `product_init_${savedProduct._id}`, // Benzersiz bir ID
+        items: [{
+          productId: savedProduct._id,
+          quantity: savedProduct.stock
+        }]
+      };
+      // inventory-service'in dinlediği "product.stock.increase" olayını kullanıyoruz
+      await publisher.publish('product.stock.increase', inventoryPayload);
+      logger.info(`Published initial stock event for product ${savedProduct._id}`);
+    } catch (publishError) {
+      // Olay yayınlama başarısız olursa sadece logla, ana işlemi durdurma
+      logger.error(`🚨 CRITICAL: Failed to publish initial stock event for product ${savedProduct._id}:`, publishError);
+    }
       
       await product.populate([
         { path: 'category', select: 'name slug' },

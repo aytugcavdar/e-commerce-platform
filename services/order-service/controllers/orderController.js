@@ -7,6 +7,7 @@ const {
   logger,
   rabbitmq: { publisher }
 } = require('@ecommerce/shared-utils');
+const { success } = require('@ecommerce/shared-utils/helpers/responseFormatter');
 
 class OrderController {
   /**
@@ -42,7 +43,7 @@ class OrderController {
   logger.info(`[OrderService] Fetching products: ${productIds}`);
 
   const productResponse = await axios.post(
-    `${process.env.PRODUCT_SERVICE_URL}/api/products/bulk`,  // ✅ Doğru URL
+    `${process.env.PRODUCT_SERVICE_URL}/bulk`,  // ✅ Doğru URL
     { ids: productIds },
     {
       timeout: 5000,  // 5 saniye timeout
@@ -52,7 +53,8 @@ class OrderController {
 
   logger.info('[OrderService] Product response:', productResponse.data);
 
-  if (!productResponse.data?.success) {
+
+  if (productResponse.data?.status !== 'success') {
     throw new Error('Product service returned unsuccessful response');
   }
 
