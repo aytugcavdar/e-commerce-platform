@@ -29,17 +29,19 @@ class InventoryController {
     }
 
     const productIds = items.map(item => new mongoose.Types.ObjectId(item.productId));
-    const quantitiesNeeded = new Map(items.map(item => [item.productId.toString(), item.quantity]));
 
-    // İlgili ürünlerin stok kayıtlarını veritabanından çek
-    const inventoryRecords = await Inventory.find({ product: { $in: productIds } });
+    // ✅ DÜZELTME: Alan adı 'productId' olmalı
+    const inventoryRecords = await Inventory.find({ productId: { $in: productIds } });
 
     let allAvailable = true;
     const unavailableItems = [];
 
     for (const item of items) {
-      const record = inventoryRecords.find(inv => inv.product.toString() === item.productId.toString());
-      const available = record ? record.availableQuantity : 0; // Modeldeki virtual'ı kullan
+      // ✅ DÜZELTME: Alan adı 'productId' olmalı
+      const record = inventoryRecords.find(inv => inv.productId.toString() === item.productId.toString());
+      
+      // Modeldeki virtual'ı (availableQuantity) kullanalım
+      const available = record ? record.availableQuantity : 0; 
 
       if (!record || available < item.quantity) {
         allAvailable = false;
@@ -47,22 +49,20 @@ class InventoryController {
           productId: item.productId,
           needed: item.quantity,
           available: available,
-          // name: product.name // product-service'ten isim alınabilir ama şimdilik ID yeterli
         });
         logger.warn(`Stock check failed for product ${item.productId}: Needed ${item.quantity}, Available ${available}`);
       }
     }
 
     if (!allAvailable) {
-  // ✅ DÜZELTME: Stok olmasa bile 200 OK dön, 
-  // order-service'in try bloğu çalışsın, catch bloğu değil.
-  return res.status(httpStatus.OK).json( 
-    ResponseFormatter.success(
-      { allAvailable: false, unavailableItems },
-      'Stokta olmayan ürünler var'
-    )
-  );
-}
+      // ✅ Bu kısım doğru: Stok olmasa bile 200 OK dön
+      return res.status(httpStatus.OK).json( 
+        ResponseFormatter.success(
+          { allAvailable: false, unavailableItems },
+          'Stokta olmayan ürünler var'
+        )
+      );
+    }
 
     // Her şey yolundaysa başarılı cevap dön
     logger.info('Stock check successful for all items.');
