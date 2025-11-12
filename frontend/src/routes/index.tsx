@@ -74,9 +74,13 @@ const CartPage = lazy(() => import('@/features/cart/pages/CartPage'));
 // ============================================
 const AdminDashboardPage = lazy(() => import('@/features/admin/pages/DashboardPage'));
 const AdminProductsPage = lazy(() => import('@/features/admin/pages/ProductsManagementPage'));
+const AdminProductFormPage = lazy(() => import('@/features/admin/pages/ProductFormPage')); 
 const AdminOrdersPage = lazy(() => import('@/features/admin/pages/OrdersManagementPage'));
 const AdminUsersPage = lazy(() => import('@/features/admin/pages/UsersManagementPage'));
-
+const AdminCategoriesPage = lazy(() => import('@/features/admin/pages/CategoriesManagementPage'));
+const CategoryFormPage = lazy(() => import('@/features/admin/pages/CategoryFormPage'));
+const AdminBrandsPage = lazy(() => import('@/features/admin/pages/BrandsManagementPage'));
+const BrandFormPage = lazy(() => import('@/features/admin/pages/BrandFormPage'));
 /**
  * 🎯 APP ROUTES - Ana Route Yapısı
  */
@@ -144,25 +148,35 @@ const AppRoutes = () => {
         
         {/**
          * 👨‍💼 ADMIN ROUTES (Admin Layout, sadece admin)
-         * 
-         * AdminRoute: Sadece admin rolü erişebilir
-         * Admin değilse ana sayfaya yönlendir
-         */}
+         */
         <Route path="/admin" element={<AdminRoute />}>
           {/* Admin Dashboard */}
           <Route index element={<AdminDashboardPage />} />
           
-          {/* Ürün Yönetimi */}
+          {/* Ürün Yönetimi (GÜNCELLENDİ) */}
           <Route path="products" element={<AdminProductsPage />} />
+          <Route path="products/new" element={<AdminProductFormPage />} />
+          <Route path="products/:id/edit" element={<AdminProductFormPage />} />
           
+          {/* Kategori Yönetimi (YENİ) */}
+          <Route path="categories" element={<AdminCategoriesPage />} />
+          <Route path="categories/new" element={<CategoryFormPage />} />
+          <Route path="categories/:id/edit" element={<CategoryFormPage />} />
+
+          {/* Marka Yönetimi (YENİ) */}
+          <Route path="brands" element={<AdminBrandsPage />} />
+          <Route path="brands/new" element={<BrandFormPage />} />
+          <Route path="brands/:id/edit" element={<BrandFormPage />} />
+
           {/* Sipariş Yönetimi */}
           <Route path="orders" element={<AdminOrdersPage />} />
           
           {/* Kullanıcı Yönetimi */}
           <Route path="users" element={<AdminUsersPage />} />
         </Route>
+      }
         
-        {/**
+       {/**
          * ❌ 404 - Sayfa Bulunamadı
          */}
         <Route path="/404" element={<NotFoundPage />} />
@@ -171,6 +185,7 @@ const AppRoutes = () => {
     </Suspense>
   );
 };
+
 
 export default AppRoutes;
 

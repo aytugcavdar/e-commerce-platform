@@ -79,21 +79,57 @@ const ProductFormPage = () => {
    * 📊 FETCH CATEGORIES & BRANDS
    */
   useEffect(() => {
-    const fetchData = async () => {
+    
+    // Kategorileri güvenli bir şekilde çek
+    const fetchCategories = async () => {
       try {
-        const [categoriesRes, brandsRes] = await Promise.all([
-          apiClient.get(CATEGORY_ENDPOINTS.LIST),
-          apiClient.get(BRAND_ENDPOINTS.LIST),
-        ]);
+        const res = await apiClient.get(CATEGORY_ENDPOINTS.LIST);
+        
+        // Olası iki veri yapısını da kontrol et:
+        // 1. res.data.data.categories (Obje içindeyse)
+        // 2. res.data.data (Doğrudan dizi ise)
+        // 3. [] (Hiçbiri değilse boş dizi ata)
+        const categoriesData = res.data.data?.categories || res.data.data || [];
+        
+        if (!Array.isArray(categoriesData)) {
+            console.error("Kategoriler API'den dizi olarak gelmedi:", res.data);
+            toast.error('Kategori verisi hatalı yüklendi');
+            setCategories([]); // Hata durumunda boş diziye çek
+        } else {
+            setCategories(categoriesData);
+        }
 
-        setCategories(categoriesRes.data.data);
-        setBrands(brandsRes.data.data);
       } catch (error) {
-        toast.error('Veriler yüklenemedi');
+        toast.error('Kategoriler yüklenemedi');
+        setCategories([]); // Hata durumunda boş dizi
       }
     };
 
-    fetchData();
+    // Markaları güvenli bir şekilde çek
+    const fetchBrands = async () => {
+      try {
+        const res = await apiClient.get(BRAND_ENDPOINTS.LIST);
+        
+        // Olası iki veri yapısını da kontrol et:
+        const brandsData = res.data.data?.brands || res.data.data || [];
+        
+        if (!Array.isArray(brandsData)) {
+            console.error("Markalar API'den dizi olarak gelmedi:", res.data);
+            toast.error('Marka verisi hatalı yüklendi');
+            setBrands([]); // Hata durumunda boş diziye çek
+        } else {
+            setBrands(brandsData);
+        }
+        
+      } catch (error) {
+        toast.error('Markalar yüklenemedi');
+        setBrands([]); // Hata durumunda boş dizi
+      }
+    };
+
+    fetchCategories();
+    fetchBrands();
+    
   }, []);
 
   /**
