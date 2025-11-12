@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
-const cookieParser = require('cookie-parser'); // ✅ YENİ
+const cookieParser = require('cookie-parser');
 const {createProxyMiddleware} = require('http-proxy-middleware');
 const rateLimit = require('express-rate-limit');
 const axios = require('axios');
@@ -17,7 +17,6 @@ const {
 
 const app = express();
 
-// ✅ YENİ: Cookie parser middleware (CORS'tan ÖNCE olmalı)
 app.use(cookieParser());
 
 app.use(helmet({
@@ -26,13 +25,12 @@ app.use(helmet({
 
 app.use(compression());
 
-// ✅ CORS ayarları güncellendi
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173'],
-  credentials: true, // ✅ Cookie'lere izin ver
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'], // ✅ Cookie header'ına izin
-  exposedHeaders: ['Set-Cookie'] // ✅ Set-Cookie header'ını frontend'e gönder
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  exposedHeaders: ['Set-Cookie']
 }));
 
 const limiter = rateLimit({
@@ -143,25 +141,26 @@ const onProxyError = (err, req, res) => {
     );
 };
 
-// ✅ GÜNCELLEME: Auth Service Proxy (Cookie desteği eklendi)
+// ============================================
+// AUTH & USER SERVICE PROXIES
+// ============================================
+
 const authServiceProxy = createProxyMiddleware({
   target: process.env.USER_SERVICE_URL || 'http://user-service:5001', 
   changeOrigin: true,
   pathRewrite: {
     '^/api/auth': '/'
   },
-  // ✅ KRITIK: Cookie'leri otomatik ilet
   cookieDomainRewrite: {
-    "*": "" // Tüm domain'leri frontend domain'e yönlendir
+    "*": ""
   },
   cookiePathRewrite: {
-    "*": "/" // Tüm path'leri root'a yönlendir
+    "*": "/"
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {
     logger.info(`🚀 Proxying to User Service: ${req.method} ${req.url}`);
     
-    // Cookie'leri backend'e ilet
     if (req.headers.cookie) {
       proxyReq.setHeader('Cookie', req.headers.cookie);
       logger.info(`🍪 Forwarding cookies to backend: ${req.headers.cookie.substring(0, 100)}...`);
@@ -170,7 +169,6 @@ const authServiceProxy = createProxyMiddleware({
   onProxyRes: (proxyRes, req, res) => {
     logger.info(`✅ User Service Response: ${proxyRes.statusCode}`);
     
-    // Backend'den gelen Set-Cookie header'larını logla
     const setCookieHeaders = proxyRes.headers['set-cookie'];
     if (setCookieHeaders) {
       logger.info(`🍪 Backend sent ${setCookieHeaders.length} cookies`);
@@ -182,16 +180,13 @@ const authServiceProxy = createProxyMiddleware({
     }
   }
 });
-app.use('/api/auth', authServiceProxy);
-
 
 const userServiceProxy = createProxyMiddleware({
   target: process.env.USER_SERVICE_URL || 'http://user-service:5001', 
   changeOrigin: true,
   pathRewrite: {
-    '^/api/users': '/' // /api/users/admin/all -> /admin/all olarak çevir
+    '^/api/users': '/'
   },
-  // Cookie'leri bu rotada da ilet
   cookieDomainRewrite: {
     "*": "" 
   },
@@ -202,7 +197,6 @@ const userServiceProxy = createProxyMiddleware({
   onProxyReq: (proxyReq, req, res) => {
     logger.info(`🚀 Proxying to User Service (Users): ${req.method} ${req.url}`);
     
-    // Cookie'leri backend'e ilet
     if (req.headers.cookie) {
       proxyReq.setHeader('Cookie', req.headers.cookie);
       logger.info(`🍪 Forwarding cookies to backend: ${req.headers.cookie.substring(0, 100)}...`);
@@ -212,56 +206,63 @@ const userServiceProxy = createProxyMiddleware({
     logger.info(`✅ User Service (Users) Response: ${proxyRes.statusCode}`);
   }
 });
-app.use('/api/users', userServiceProxy);
 
-// Diğer proxy'ler (değişiklik yok)
-const productServiceProxy = createProxyMiddleware({
-  target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/products': '/' 
-  },
-  onError: onProxyError,
-  onProxyReq: (proxyReq, req, res) => {
-    logger.info(`Proxying to Product Service: ${req.method} ${req.url}`);
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    logger.info(`Product Service Response: ${proxyRes.statusCode}`);
-  }
-});
-app.use('/api/products', productServiceProxy);
+// ============================================
+// PRODUCT SERVICE PROXIES
+// ⚠️ KRITIK: SIRALAMA ÇOK ÖNEMLİ!
+// ============================================
 
+// 1️⃣ BRANDS - En spesifik route önce
 const brandServiceProxy = createProxyMiddleware({
   target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/brands': '/brands'
+    '^/api/brands': '/brands'  // ✅ /api/brands -> /brands
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {
-    logger.info(`Proxying to Product Service (Brands): ${req.method} ${req.url}`);
+    logger.info(`🏷️  Proxying to Product Service (Brands): ${req.method} ${req.url}`);
   },
   onProxyRes: (proxyRes, req, res) => {
-    logger.info(`Product Service (Brands) Response: ${proxyRes.statusCode}`);
+    logger.info(`✅ Product Service (Brands) Response: ${proxyRes.statusCode}`);
   }
 });
-app.use('/api/brands', brandServiceProxy);
 
+// 2️⃣ CATEGORIES - İkinci spesifik route
 const categoryServiceProxy = createProxyMiddleware({
   target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/categories': '/categories'
+    '^/api/categories': '/categories'  // ✅ /api/categories -> /categories
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {
-    logger.info(`Proxying to Product Service (Categories): ${req.method} ${req.url}`);
+    logger.info(`📁 Proxying to Product Service (Categories): ${req.method} ${req.url}`);
   },
   onProxyRes: (proxyRes, req, res) => {
-    logger.info(`Product Service (Categories) Response: ${proxyRes.statusCode}`);
+    logger.info(`✅ Product Service (Categories) Response: ${proxyRes.statusCode}`);
   }
 });
-app.use('/api/categories', categoryServiceProxy);
+
+// 3️⃣ PRODUCTS - Genel route en sona
+const productServiceProxy = createProxyMiddleware({
+  target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/products': '/'  // ✅ /api/products -> /
+  },
+  onError: onProxyError,
+  onProxyReq: (proxyReq, req, res) => {
+    logger.info(`📦 Proxying to Product Service (Products): ${req.method} ${req.url}`);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.info(`✅ Product Service (Products) Response: ${proxyRes.statusCode}`);
+  }
+});
+
+// ============================================
+// ORDER SERVICE PROXY
+// ============================================
 
 const orderServiceProxy = createProxyMiddleware({
   target: process.env.ORDER_SERVICE_URL || 'http://order-service:5003',
@@ -269,7 +270,6 @@ const orderServiceProxy = createProxyMiddleware({
   pathRewrite: {
     '^/api/orders': ''
   },
-  // ✅ YENİ: Cookie desteği ekle
   cookieDomainRewrite: {
     "*": ""
   },
@@ -280,7 +280,6 @@ const orderServiceProxy = createProxyMiddleware({
   onProxyReq: (proxyReq, req, res) => {
     logger.info(`🚀 Proxying to Order Service: ${req.method} ${req.url}`);
     
-    // ✅ Cookie'leri backend'e ilet
     if (req.headers.cookie) {
       proxyReq.setHeader('Cookie', req.headers.cookie);
       logger.info(`🍪 Forwarding cookies to Order Service: ${req.headers.cookie.substring(0, 100)}...`);
@@ -297,7 +296,10 @@ const orderServiceProxy = createProxyMiddleware({
     }
   }
 });
-app.use('/api/orders', orderServiceProxy);
+
+// ============================================
+// OTHER SERVICE PROXIES
+// ============================================
 
 const inventoryServiceProxy = createProxyMiddleware({
   target: process.env.INVENTORY_SERVICE_URL || 'http://inventory-service:5005',
@@ -313,7 +315,6 @@ const inventoryServiceProxy = createProxyMiddleware({
     logger.info(`Inventory Service Response: ${proxyRes.statusCode}`);
   }
 });
-app.use('/api/inventory', inventoryServiceProxy);
 
 const shippingServiceProxy = createProxyMiddleware({
   target: process.env.SHIPPING_SERVICE_URL || 'http://shipping-service:5006',
@@ -329,7 +330,26 @@ const shippingServiceProxy = createProxyMiddleware({
     logger.info(`Shipping Service Response: ${proxyRes.statusCode}`);
   }
 });
+
+// ============================================
+// ⚠️ REGISTER ROUTES - ORDER MATTERS!
+// ============================================
+
+app.use('/api/auth', authServiceProxy);
+app.use('/api/users', userServiceProxy);
+
+// ✅ CRITICAL: Specific routes BEFORE general routes
+app.use('/api/brands', brandServiceProxy);        // 1. Brands first
+app.use('/api/categories', categoryServiceProxy);  // 2. Categories second
+app.use('/api/products', productServiceProxy);     // 3. Products last
+
+app.use('/api/orders', orderServiceProxy);
+app.use('/api/inventory', inventoryServiceProxy);
 app.use('/api/shipping', shippingServiceProxy);
+
+// ============================================
+// ERROR HANDLERS
+// ============================================
 
 app.use(ErrorHandler.notFound);
 app.use(ErrorHandler.handle);
@@ -347,7 +367,10 @@ const startServer = async () => {
       logger.info(`🔗 Shipping Service URL: ${process.env.SHIPPING_SERVICE_URL || 'http://shipping-service:5006'}`);
       logger.info(`🔗 Payment Service (Health Check): ${process.env.PAYMENT_SERVICE_URL || 'http://payment-service:5004'}`);
       logger.info(`🌐 CORS Origins: ${process.env.ALLOWED_ORIGINS || 'http://localhost:5173'}`);
-      logger.info(`🍪 Cookie support: ENABLED`); // ✅ YENİ
+      logger.info(`🍪 Cookie support: ENABLED`);
+      logger.info(`🏷️  Brand proxy: /api/brands -> /brands`);
+      logger.info(`📁 Category proxy: /api/categories -> /categories`);
+      logger.info(`📦 Product proxy: /api/products -> /`);
     });
   } catch (error) {
     logger.error('❌ Failed to start Gateway:', error);

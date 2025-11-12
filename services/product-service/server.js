@@ -12,7 +12,9 @@ const {
 const { ErrorHandler } = middleware;
 const { CloudinaryHelper } = helpers;
 
-// Routes
+// ============================================
+// ROUTES - Import all routes
+// ============================================
 const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const brandRoutes = require('./routes/brandRoutes');
@@ -22,7 +24,9 @@ const app = express();
 // Initialize Cloudinary
 CloudinaryHelper.init();
 
-// Middleware
+// ============================================
+// MIDDLEWARE
+// ============================================
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
   credentials: true
@@ -30,28 +34,50 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check
+// ============================================
+// HEALTH CHECK
+// ============================================
 app.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Product Service is healthy',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    routes: {
+      brands: '/brands',
+      categories: '/categories',
+      products: '/'
+    }
   });
 });
 
-// Routes
-app.use('/categories', categoryRoutes); 
+// ============================================
+// ROUTES - Order matters!
+// ============================================
+
+// 1️⃣ Brands - Most specific first
 app.use('/brands', brandRoutes);
-app.use('/', productRoutes);   
+logger.info('📌 Brand routes registered at: /brands');
 
+// 2️⃣ Categories - Second specific
+app.use('/categories', categoryRoutes);
+logger.info('📌 Category routes registered at: /categories');
 
-// Error handling
+// 3️⃣ Products - General route last
+app.use('/', productRoutes);
+logger.info('📌 Product routes registered at: /');
+
+// ============================================
+// ERROR HANDLING
+// ============================================
 app.use(ErrorHandler.notFound);
 app.use(ErrorHandler.handle);
 
 const PORT = process.env.PORT || 5002;
 
+// ============================================
+// START SERVER
+// ============================================
 const startServer = async () => {
   try {
     // Connect to MongoDB
@@ -62,6 +88,11 @@ const startServer = async () => {
     app.listen(PORT, () => {
       logger.info(`🚀 Product Service is running on port ${PORT}`);
       logger.info(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`📍 Routes:`);
+      logger.info(`   - GET /health`);
+      logger.info(`   - /brands/* (Brand routes)`);
+      logger.info(`   - /categories/* (Category routes)`);
+      logger.info(`   - /* (Product routes)`);
     });
   } catch (error) {
     logger.error('❌ Failed to start Product Service:', error);
@@ -69,7 +100,9 @@ const startServer = async () => {
   }
 };
 
-// Graceful shutdown
+// ============================================
+// GRACEFUL SHUTDOWN
+// ============================================
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM signal received: closing Product Service gracefully');
   await mongoose.connection.close();

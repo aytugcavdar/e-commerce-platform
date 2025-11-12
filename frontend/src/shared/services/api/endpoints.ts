@@ -102,7 +102,7 @@ export const PRODUCT_ENDPOINTS = {
  */
 export const CATEGORY_ENDPOINTS = {
   // Tüm kategoriler
-  LIST: '/categories',
+  LIST: '/categories/categories',
   
   // Kategori ağacı (hiyerarşik)
   TREE: '/categories/tree',
@@ -131,7 +131,7 @@ export const CATEGORY_ENDPOINTS = {
  */
 export const BRAND_ENDPOINTS = {
   // Tüm markalar
-  LIST: '/brands',
+  LIST: '/brands/brands',
   
   // Marka detayı (ID ile)
   DETAIL: (id: string) => `/brands/${id}`,

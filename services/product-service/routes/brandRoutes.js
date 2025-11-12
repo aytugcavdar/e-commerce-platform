@@ -1,28 +1,18 @@
 const express = require('express');
 const multer = require('multer');
 const BrandController = require('../controllers/brandController');
-
 const { middleware, validators } = require('@ecommerce/shared-utils');
 
-// Validators'ı al
 const { BrandValidators } = validators;
-
-// Middleware'leri al
-const { 
-  ValidationMiddleware, 
-  AuthMiddleware,
-  RateLimitMiddleware 
-} = middleware;
+const { ValidationMiddleware, AuthMiddleware, RateLimitMiddleware } = middleware;
 
 const router = express.Router();
 
-// Multer configuration for brand logo
+// Multer configuration
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
-  limits: { 
-    fileSize: 2 * 1024 * 1024, // 2MB
-  },
+  limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -32,47 +22,32 @@ const upload = multer({
   },
 });
 
-// ===========================================
+// ============================================
+// 🔍 DEBUG: Log when brandRoutes is loaded
+// ============================================
+console.log('🏷️  brandRoutes.js loaded');
+
+// ============================================
 // PUBLIC ROUTES
-// ===========================================
+// ============================================
 
-/**
- * @route   GET /api/brands
- * @desc    Get all brands
- * @access  Public
- * @query   isActive, isFeatured, search
- */
-router.get('/', BrandController.getAllBrands);
+router.get('/', (req, res, next) => {
+  console.log('🏷️  GET /brands called');
+  next();
+}, BrandController.getAllBrands);
 
-/**
- * @route   GET /api/brands/slug/:slug
- * @desc    Get brand by slug
- * @access  Public
- */
 router.get('/slug/:slug', BrandController.getBrandBySlug);
 
-/**
- * @route   GET /api/brands/:id
- * @desc    Get brand by ID
- * @access  Public
- */
-router.get(
-  '/:id',
+router.get('/:id', 
   ValidationMiddleware.validateObjectId('id'),
   BrandController.getBrandById
 );
 
-// ===========================================
+// ============================================
 // PROTECTED ROUTES (Admin only)
-// ===========================================
+// ============================================
 
-/**
- * @route   POST /api/brands
- * @desc    Create new brand
- * @access  Private/Admin
- */
-router.post(
-  '/',
+router.post('/',
   AuthMiddleware.verifyToken,
   AuthMiddleware.isAdmin,
   RateLimitMiddleware.uploadLimiter,
@@ -81,13 +56,7 @@ router.post(
   BrandController.createBrand
 );
 
-/**
- * @route   PUT /api/brands/:id
- * @desc    Update brand
- * @access  Private/Admin
- */
-router.put(
-  '/:id',
+router.put('/:id',
   AuthMiddleware.verifyToken,
   AuthMiddleware.isAdmin,
   ValidationMiddleware.validateObjectId('id'),
@@ -96,13 +65,7 @@ router.put(
   BrandController.updateBrand
 );
 
-/**
- * @route   DELETE /api/brands/:id
- * @desc    Delete brand
- * @access  Private/Admin
- */
-router.delete(
-  '/:id',
+router.delete('/:id',
   AuthMiddleware.verifyToken,
   AuthMiddleware.isAdmin,
   ValidationMiddleware.validateObjectId('id'),
