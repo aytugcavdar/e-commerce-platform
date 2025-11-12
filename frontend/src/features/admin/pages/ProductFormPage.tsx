@@ -112,6 +112,7 @@ const ProductFormPage = () => {
         
         // Olası iki veri yapısını da kontrol et:
         const brandsData = res.data.data?.brands || res.data.data || [];
+        console.log('Marka verisi:', res);
         
         if (!Array.isArray(brandsData)) {
             console.error("Markalar API'den dizi olarak gelmedi:", res.data);

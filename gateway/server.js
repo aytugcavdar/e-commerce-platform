@@ -219,7 +219,7 @@ const productServiceProxy = createProxyMiddleware({
   target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/products': '/api/products' 
+    '^/api/products': '/' 
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {
@@ -235,7 +235,7 @@ const brandServiceProxy = createProxyMiddleware({
   target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/brands': '/api/products/brands'
+    '^/api/brands': '/brands'
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {
@@ -251,7 +251,7 @@ const categoryServiceProxy = createProxyMiddleware({
   target: process.env.PRODUCT_SERVICE_URL || 'http://product-service:5002',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/categories': '/api/products/categories'
+    '^/api/categories': '/categories'
   },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {

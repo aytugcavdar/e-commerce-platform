@@ -37,12 +37,27 @@ const AdminBrandsPage = () => {
       
       const response = await apiClient.get(BRAND_ENDPOINTS.LIST);
       
-      // API'den dönen veri yapısına göre (genellikle response.data.data)
-      setBrands(response.data.data); 
+      // ✅ FIX: Farklı API response yapılarını kontrol et
+      const data = response.data.data;
+      
+      // API'den array, object veya nested object gelebilir
+      if (Array.isArray(data)) {
+        setBrands(data);
+      } else if (data?.brands && Array.isArray(data.brands)) {
+        setBrands(data.brands);
+      } else if (typeof data === 'object' && data !== null) {
+        // Eğer object ise, değerleri array'e çevir
+        setBrands(Object.values(data));
+      } else {
+        console.error('Unexpected API response format:', response.data);
+        setBrands([]);
+      }
       
     } catch (err: any) {
+      console.error('Fetch brands error:', err);
       setError(err.response?.data?.message || 'Markalar yüklenirken hata oluştu');
       toast.error('Markalar yüklenemedi');
+      setBrands([]);
     } finally {
       setLoading(false);
     }
@@ -83,7 +98,6 @@ const AdminBrandsPage = () => {
    */
   const toggleBrandStatus = async (brandId: string, currentStatus: boolean) => {
     try {
-      // Backend PUT /api/brands/:id
       await apiClient.put(BRAND_ENDPOINTS.UPDATE(brandId), {
         isActive: !currentStatus
       });
@@ -114,7 +128,6 @@ const AdminBrandsPage = () => {
           </p>
         </div>
         
-        {/* Bu linkin çalışması için index.tsx'te rotanın tanımlı olması gerekir */}
         <Link to="/admin/brands/new">
           <Button>
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -163,7 +176,7 @@ const AdminBrandsPage = () => {
                           <img
                             src={brand.logo}
                             alt={brand.name}
-                            className="w-12 h-12 rounded-lg object-contain" // object-contain logo için daha iyi olabilir
+                            className="w-12 h-12 rounded-lg object-contain"
                           />
                         )}
                         <div className={brand.logo ? "ml-4" : ""}>
@@ -193,7 +206,6 @@ const AdminBrandsPage = () => {
                     {/* İşlemler */}
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {/* Bu linkin çalışması için index.tsx'te rotanın tanımlı olması gerekir */}
                         <Link
                           to={`/admin/brands/${brand._id}/edit`}
                           className="text-blue-600 hover:text-blue-700 p-1"

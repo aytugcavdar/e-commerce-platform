@@ -12,10 +12,9 @@ import { Loading, ErrorMessage } from '@/shared/components/ui/feedback';
  * Önemli metrikleri ve istatistikleri gösterir.
  * 
  * İçerik:
- * - Stat Cards (Toplam ürün, sipariş, kullanıcı, gelir)
+ * - Stat Cards (Toplam ürün, sipariş, kullanıcı, gelir, kategori, marka)
  * - Son Siparişler
- * - Düşük Stok Uyarıları
- * - Popüler Ürünler
+ * - Hızlı Erişim Kartları
  */
 
 interface DashboardStats {
@@ -44,6 +43,8 @@ const AdminDashboardPage = () => {
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [categoriesCount, setCategoriesCount] = useState(0);
+  const [brandsCount, setBrandsCount] = useState(0);
 
   /**
    * 📊 FETCH DASHBOARD DATA
@@ -64,6 +65,22 @@ const AdminDashboardPage = () => {
           params: { limit: 5, sort: '-createdAt' }
         });
         setRecentOrders(ordersResponse.data.data.orders);
+        
+        // Kategori sayısını çek
+        try {
+          const categoriesResponse = await apiClient.get('/categories');
+          setCategoriesCount(categoriesResponse.data.data?.length || 0);
+        } catch (err) {
+          console.warn('Kategoriler yüklenemedi:', err);
+        }
+        
+        // Marka sayısını çek
+        try {
+          const brandsResponse = await apiClient.get('/brands');
+          setBrandsCount(brandsResponse.data.data?.length || 0);
+        } catch (err) {
+          console.warn('Markalar yüklenemedi:', err);
+        }
         
       } catch (err: any) {
         setError(err.response?.data?.message || 'Veriler yüklenirken hata oluştu');
@@ -129,7 +146,7 @@ const AdminDashboardPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* 📊 STAT CARDS */}
+      {/* 📊 STAT CARDS - ANA İSTATİSTİKLER */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Toplam Ürün */}
         <StatCard
@@ -166,6 +183,25 @@ const AdminDashboardPage = () => {
           icon="💰"
           color="bg-yellow-500"
           badge={`${stats?.pendingOrders || 0} beklemede`}
+        />
+      </div>
+
+      {/* 🆕 YENİ KARTLAR - KATEGORİ VE MARKA */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <StatCard
+          title="Toplam Kategori"
+          value={categoriesCount}
+          icon="📂"
+          color="bg-indigo-500"
+          link="/admin/categories"
+        />
+
+        <StatCard
+          title="Toplam Marka"
+          value={brandsCount}
+          icon="🏷️"
+          color="bg-pink-500"
+          link="/admin/brands"
         />
       </div>
 
@@ -243,7 +279,7 @@ const AdminDashboardPage = () => {
       </div>
 
       {/* 🚀 HIZLI ERİŞİM */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <QuickActionCard
           title="Yeni Ürün Ekle"
           description="Mağazaya yeni ürün ekleyin"
@@ -258,10 +294,16 @@ const AdminDashboardPage = () => {
           badge={stats?.pendingOrders}
         />
         <QuickActionCard
-          title="Kullanıcıları Gör"
-          description="Tüm kullanıcıları listeleyin"
-          icon="👥"
-          link="/admin/users"
+          title="Yeni Kategori"
+          description="Kategori ekle veya düzenle"
+          icon="📂"
+          link="/admin/categories"
+        />
+        <QuickActionCard
+          title="Yeni Marka"
+          description="Marka ekle veya düzenle"
+          icon="🏷️"
+          link="/admin/brands"
         />
       </div>
     </div>
@@ -277,7 +319,7 @@ interface StatCardProps {
   icon: string;
   color: string;
   link?: string;
-  badge?: string;
+  badge?: string | number;
 }
 
 const StatCard = ({ title, value, icon, color, link, badge }: StatCardProps) => {
@@ -287,7 +329,7 @@ const StatCard = ({ title, value, icon, color, link, badge }: StatCardProps) => 
         <div className={`w-12 h-12 ${color} rounded-lg flex items-center justify-center text-2xl`}>
           {icon}
         </div>
-        {badge && (
+        {badge !== undefined && badge !== null && (
           <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
             {badge}
           </span>

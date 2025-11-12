@@ -37,13 +37,27 @@ const AdminCategoriesPage = () => {
       
       const response = await apiClient.get(CATEGORY_ENDPOINTS.LIST);
       
-      // API'den dönen veri yapısına göre (genellikle response.data.data)
-      // ProductFormPage'deki kullanıma göre .data.data varsayıyoruz
-      setCategories(response.data.data); 
+      // ✅ FIX: Farklı API response yapılarını kontrol et
+      const data = response.data.data;
+      
+      // API'den array, object veya nested object gelebilir
+      if (Array.isArray(data)) {
+        setCategories(data);
+      } else if (data?.categories && Array.isArray(data.categories)) {
+        setCategories(data.categories);
+      } else if (typeof data === 'object' && data !== null) {
+        // Eğer object ise, değerleri array'e çevir
+        setCategories(Object.values(data));
+      } else {
+        console.error('Unexpected API response format:', response.data);
+        setCategories([]);
+      }
       
     } catch (err: any) {
+      console.error('Fetch categories error:', err);
       setError(err.response?.data?.message || 'Kategoriler yüklenirken hata oluştu');
       toast.error('Kategoriler yüklenemedi');
+      setCategories([]);
     } finally {
       setLoading(false);
     }
@@ -84,7 +98,6 @@ const AdminCategoriesPage = () => {
    */
   const toggleCategoryStatus = async (categoryId: string, currentStatus: boolean) => {
     try {
-      // Backend PUT /api/categories/:id
       await apiClient.put(CATEGORY_ENDPOINTS.UPDATE(categoryId), {
         isActive: !currentStatus
       });
