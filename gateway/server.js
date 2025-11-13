@@ -251,6 +251,12 @@ const productServiceProxy = createProxyMiddleware({
   pathRewrite: {
     '^/api/products': '/'  // ✅ /api/products -> /
   },
+  cookieDomainRewrite: {
+    "*": "" 
+  },
+  cookiePathRewrite: {
+    "*": "/" 
+  },
   onError: onProxyError,
   onProxyReq: (proxyReq, req, res) => {
     logger.info(`📦 Proxying to Product Service (Products): ${req.method} ${req.url}`);

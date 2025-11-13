@@ -209,49 +209,48 @@ const ProductFormPage = () => {
    * 💾 FORM SUBMIT
    */
   const onSubmit = async (data: ProductFormData) => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      // FormData oluştur (resimler için)
-      const formData = new FormData();
-      formData.append('name', data.name);
-      formData.append('description', data.description);
-      formData.append('price', data.price.toString());
-      if (data.discountedPrice) {
-        formData.append('discountedPrice', data.discountedPrice.toString());
-      }
-      formData.append('stock', data.stock.toString());
-      formData.append('category', data.category);
-      formData.append('brand', data.brand);
-      if (data.sku) formData.append('sku', data.sku);
-      if (data.barcode) formData.append('barcode', data.barcode);
-
-      // Resimleri ekle
-      images.forEach(image => {
-        formData.append('images', image);
-      });
-
-      if (isEditMode && id) {
-        // Güncelleme
-        await apiClient.put(PRODUCT_ENDPOINTS.UPDATE(id), formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        toast.success('Ürün güncellendi!');
-      } else {
-        // Yeni ürün
-        await apiClient.post(PRODUCT_ENDPOINTS.CREATE, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        toast.success('Ürün eklendi!');
-      }
-
-      navigate('/admin/products');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'İşlem başarısız');
-    } finally {
-      setLoading(false);
+    // FormData oluştur
+    const formData = new FormData();
+    formData.append('name', data.name);
+    formData.append('description', data.description);
+    formData.append('price', data.price.toString());
+    if (data.discountedPrice) {
+      formData.append('discountedPrice', data.discountedPrice.toString());
     }
-  };
+    formData.append('stock', data.stock.toString());
+    formData.append('category', data.category);
+    formData.append('brand', data.brand);
+    if (data.sku) formData.append('sku', data.sku);
+    if (data.barcode) formData.append('barcode', data.barcode);
+
+    // Resimleri ekle
+    images.forEach(image => {
+      formData.append('images', image);
+    });
+
+    if (isEditMode && id) {
+      // Güncelleme
+      await apiClient.put(PRODUCT_ENDPOINTS.UPDATE(id), formData);
+      // ❌ KALDIR: { headers: { 'Content-Type': 'multipart/form-data' } }
+      toast.success('Ürün güncellendi!');
+    } else {
+      // Yeni ürün
+      await apiClient.post(PRODUCT_ENDPOINTS.CREATE, formData);
+      // ❌ KALDIR: { headers: { 'Content-Type': 'multipart/form-data' } }
+      toast.success('Ürün eklendi!');
+    }
+
+    navigate('/admin/products');
+  } catch (error: any) {
+    console.error('❌ Ürün kaydedilemedi:', error);
+    toast.error(error.response?.data?.message || 'İşlem başarısız');
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (loading && isEditMode) {
     return <Loading fullScreen message="Ürün yükleniyor..." />;
