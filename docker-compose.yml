@@ -98,7 +98,7 @@ services:
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       NODE_ENV: ${NODE_ENV}
-      RabbitMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+      RABBITMQ_URI: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
     depends_on:
       rabbitmq:
         condition: service_healthy
