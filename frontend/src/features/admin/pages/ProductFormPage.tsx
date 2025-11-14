@@ -11,20 +11,6 @@ import { PRODUCT_ENDPOINTS, CATEGORY_ENDPOINTS, BRAND_ENDPOINTS } from '@/shared
 import { Button, Input, Textarea, Select } from '@/shared/components/ui/base';
 import { Loading } from '@/shared/components/ui/feedback';
 
-/**
- * 🎓 ÖĞREN: Ürün Formu (Ekle/Düzenle)
- * 
- * Bu sayfa hem yeni ürün ekleme hem de mevcut ürünü düzenleme için kullanılır.
- * 
- * Özellikler:
- * - Formik/React Hook Form ile form yönetimi
- * - Yup ile validation
- * - Çoklu resim upload
- * - Kategori ve marka seçimi
- * - Zengin metin editörü (açıklama)
- * - Preview (önizleme)
- */
-
 // Validation Schema
 const productSchema = yup.object({
   name: yup.string().required('Ürün adı gerekli').min(3, 'En az 3 karakter'),
@@ -52,7 +38,7 @@ interface Brand {
 
 const ProductFormPage = () => {
   const navigate = useNavigate();
-  const { id } = useParams(); // Düzenleme modunda ID gelir
+  const { id } = useParams();
   const isEditMode = !!id;
 
   const [loading, setLoading] = useState(false);
@@ -79,58 +65,44 @@ const ProductFormPage = () => {
    * 📊 FETCH CATEGORIES & BRANDS
    */
   useEffect(() => {
-    
-    // Kategorileri güvenli bir şekilde çek
     const fetchCategories = async () => {
       try {
         const res = await apiClient.get(CATEGORY_ENDPOINTS.LIST);
-        
-        // Olası iki veri yapısını da kontrol et:
-        // 1. res.data.data.categories (Obje içindeyse)
-        // 2. res.data.data (Doğrudan dizi ise)
-        // 3. [] (Hiçbiri değilse boş dizi ata)
         const categoriesData = res.data.data?.categories || res.data.data || [];
         
         if (!Array.isArray(categoriesData)) {
-            console.error("Kategoriler API'den dizi olarak gelmedi:", res.data);
-            toast.error('Kategori verisi hatalı yüklendi');
-            setCategories([]); // Hata durumunda boş diziye çek
+          console.error("Kategoriler API'den dizi olarak gelmedi:", res.data);
+          toast.error('Kategori verisi hatalı yüklendi');
+          setCategories([]);
         } else {
-            setCategories(categoriesData);
+          setCategories(categoriesData);
         }
-
       } catch (error) {
         toast.error('Kategoriler yüklenemedi');
-        setCategories([]); // Hata durumunda boş dizi
+        setCategories([]);
       }
     };
 
-    // Markaları güvenli bir şekilde çek
     const fetchBrands = async () => {
       try {
         const res = await apiClient.get(BRAND_ENDPOINTS.LIST);
-        
-        // Olası iki veri yapısını da kontrol et:
         const brandsData = res.data.data?.brands || res.data.data || [];
-        console.log('Marka verisi:', res);
         
         if (!Array.isArray(brandsData)) {
-            console.error("Markalar API'den dizi olarak gelmedi:", res.data);
-            toast.error('Marka verisi hatalı yüklendi');
-            setBrands([]); // Hata durumunda boş diziye çek
+          console.error("Markalar API'den dizi olarak gelmedi:", res.data);
+          toast.error('Marka verisi hatalı yüklendi');
+          setBrands([]);
         } else {
-            setBrands(brandsData);
+          setBrands(brandsData);
         }
-        
       } catch (error) {
         toast.error('Markalar yüklenemedi');
-        setBrands([]); // Hata durumunda boş dizi
+        setBrands([]);
       }
     };
 
     fetchCategories();
     fetchBrands();
-    
   }, []);
 
   /**
@@ -144,7 +116,6 @@ const ProductFormPage = () => {
           const response = await apiClient.get(PRODUCT_ENDPOINTS.DETAIL(id));
           const product = response.data.data;
 
-          // Form değerlerini doldur
           setValue('name', product.name);
           setValue('description', product.description);
           setValue('price', product.price);
@@ -155,7 +126,6 @@ const ProductFormPage = () => {
           setValue('sku', product.sku);
           setValue('barcode', product.barcode);
 
-          // Mevcut resimleri kaydet
           setExistingImages(product.images);
         } catch (error) {
           toast.error('Ürün yüklenemedi');
@@ -182,7 +152,6 @@ const ProductFormPage = () => {
 
     setImages(prev => [...prev, ...files]);
 
-    // Preview oluştur
     const newPreviews = files.map(file => URL.createObjectURL(file));
     setPreviewImages(prev => [...prev, ...newPreviews]);
   };
@@ -199,58 +168,125 @@ const ProductFormPage = () => {
    * 🗑️ REMOVE EXISTING IMAGE
    */
   const removeExistingImage = async (imageUrl: string) => {
-    // Backend'den resmi sil
-    // Burada image ID'si gerekir, basitleştirmek için sadece frontend'den kaldırıyoruz
     setExistingImages(prev => prev.filter(img => img.url !== imageUrl));
     toast.success('Resim kaldırıldı');
   };
 
   /**
-   * 💾 FORM SUBMIT
+   * 💾 FORM SUBMIT - ✅ DÜZELTİLMİŞ VERSİYON
    */
   const onSubmit = async (data: ProductFormData) => {
-  try {
-    setLoading(true);
-
-    // FormData oluştur
-    const formData = new FormData();
-    formData.append('name', data.name);
-    formData.append('description', data.description);
-    formData.append('price', data.price.toString());
-    if (data.discountedPrice) {
-      formData.append('discountedPrice', data.discountedPrice.toString());
-    }
-    formData.append('stock', data.stock.toString());
-    formData.append('category', data.category);
-    formData.append('brand', data.brand);
-    if (data.sku) formData.append('sku', data.sku);
-    if (data.barcode) formData.append('barcode', data.barcode);
-
-    // Resimleri ekle
-    images.forEach(image => {
-      formData.append('images', image);
-    });
-
-    if (isEditMode && id) {
-      // Güncelleme
-      await apiClient.put(PRODUCT_ENDPOINTS.UPDATE(id), formData);
-      // ❌ KALDIR: { headers: { 'Content-Type': 'multipart/form-data' } }
-      toast.success('Ürün güncellendi!');
-    } else {
-      // Yeni ürün
-      await apiClient.post(PRODUCT_ENDPOINTS.CREATE, formData);
-      // ❌ KALDIR: { headers: { 'Content-Type': 'multipart/form-data' } }
-      toast.success('Ürün eklendi!');
+    // ⚠️ Çift tıklamayı engelle
+    if (loading) {
+      console.warn('⚠️ Form zaten gönderiliyor, çift tıklama engellendi');
+      return;
     }
 
-    navigate('/admin/products');
-  } catch (error: any) {
-    console.error('❌ Ürün kaydedilemedi:', error);
-    toast.error(error.response?.data?.message || 'İşlem başarısız');
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      setLoading(true);
+
+      console.log('📦 Form data hazırlanıyor...');
+
+      // ✅ FormData oluştur
+      const formData = new FormData();
+      formData.append('name', data.name);
+      formData.append('description', data.description);
+      formData.append('price', data.price.toString());
+      
+      if (data.discountedPrice) {
+        formData.append('discountedPrice', data.discountedPrice.toString());
+      }
+      
+      formData.append('stock', data.stock.toString());
+      formData.append('category', data.category);
+      formData.append('brand', data.brand);
+      
+      if (data.sku) formData.append('sku', data.sku);
+      if (data.barcode) formData.append('barcode', data.barcode);
+
+      // ✅ Resimleri ekle
+      images.forEach((image, index) => {
+        formData.append('images', image);
+        console.log(`📸 Resim ${index + 1} eklendi:`, image.name);
+      });
+
+      // ✅ FormData içeriğini logla (debug için)
+      console.log('📋 FormData içeriği:');
+      for (let [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`  ${key}: ${value.name} (${value.size} bytes)`);
+        } else {
+          console.log(`  ${key}: ${value}`);
+        }
+      }
+
+      // ✅ KRITIK: Content-Type header'ı EKLEME!
+      // Axios otomatik olarak "multipart/form-data" + boundary ekleyecek
+      const config = {
+        headers: {
+          // ❌ YANLIŞ: 'Content-Type': 'multipart/form-data'
+          // ✅ DOĞRU: Header'ı axios'a bırak
+        },
+        // ✅ Cookie'leri gönder
+        withCredentials: true,
+        
+        // ✅ Upload progress (opsiyonel)
+        onUploadProgress: (progressEvent: any) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          console.log(`📤 Upload: ${percentCompleted}%`);
+        },
+      };
+
+      let response;
+
+      if (isEditMode && id) {
+        console.log('🔄 Ürün güncelleniyor:', id);
+        response = await apiClient.put(
+          PRODUCT_ENDPOINTS.UPDATE(id),
+          formData,
+          config
+        );
+        toast.success('Ürün güncellendi!');
+      } else {
+        console.log('➕ Yeni ürün ekleniyor...');
+        response = await apiClient.post(
+          PRODUCT_ENDPOINTS.CREATE,
+          formData,
+          config
+        );
+        toast.success('Ürün eklendi!');
+      }
+
+      console.log('✅ API Response:', response.status);
+
+      // ✅ Başarılı - yönlendir
+      navigate('/admin/products');
+
+    } catch (error: any) {
+      console.error('❌ Ürün kaydedilemedi:', error);
+      
+      // ✅ Hata detaylarını logla
+      if (error.response) {
+        console.error('📥 Error Response:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers,
+        });
+      }
+
+      // ✅ Kullanıcıya anlamlı hata mesajı
+      const errorMessage = error.response?.data?.message 
+        || error.message 
+        || 'İşlem başarısız';
+      
+      toast.error(errorMessage);
+
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading && isEditMode) {
     return <Loading fullScreen message="Ürün yükleniyor..." />;
@@ -410,7 +446,7 @@ const ProductFormPage = () => {
             Ürün Resimleri
           </h2>
 
-          {/* Mevcut Resimler (Düzenleme modunda) */}
+          {/* Mevcut Resimler */}
           {existingImages.length > 0 && (
             <div className="mb-4">
               <p className="text-sm text-gray-600 mb-2">Mevcut Resimler:</p>
@@ -452,7 +488,8 @@ const ProductFormPage = () => {
               accept="image/*"
               multiple
               onChange={handleImageChange}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              disabled={loading}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <p className="mt-1 text-xs text-gray-500">
               PNG, JPG, GIF (Max 5MB)
@@ -472,7 +509,8 @@ const ProductFormPage = () => {
                   <button
                     type="button"
                     onClick={() => removeImage(index)}
-                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    disabled={loading}
+                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-30"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -486,13 +524,18 @@ const ProductFormPage = () => {
 
         {/* Action Buttons */}
         <div className="flex gap-4">
-          <Button type="submit" isLoading={loading} disabled={loading}>
+          <Button 
+            type="submit" 
+            isLoading={loading} 
+            disabled={loading}
+          >
             {isEditMode ? 'Güncelle' : 'Kaydet'}
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => navigate('/admin/products')}
+            disabled={loading}
           >
             İptal
           </Button>
@@ -503,13 +546,3 @@ const ProductFormPage = () => {
 };
 
 export default ProductFormPage;
-
-/**
- * 💡 PRO TIP: Form Best Practices
- * 
- * 1. Validation - Client-side (Yup) + Server-side
- * 2. Preview - Kullanıcı görsün (fiyat, resim)
- * 3. Loading states - Butonları devre dışı bırak
- * 4. Error handling - Her field için ayrı
- * 5. Auto-save (Draft) - Kullanıcı kaybetmesin
- */

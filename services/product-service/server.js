@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 
 const {
   logger,
@@ -31,6 +32,10 @@ app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
   credentials: true
 }));
+
+app.use(cookieParser());
+
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

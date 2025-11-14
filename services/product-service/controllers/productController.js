@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const Category = require('../models/Category');
+const Brand = require('../models/Brand');
 const {
   middleware: { asyncHandler },
   helpers: { ResponseFormatter, CloudinaryHelper },
@@ -174,6 +175,19 @@ class ProductController {
       isFeatured
     } = req.body;
 
+    console.log('📥 Create Product Request:', {
+    contentType: req.headers['content-type'],
+    hasFiles: !!req.files,
+    filesCount: req.files?.length || 0,
+    bodyKeys: Object.keys(req.body),
+    user: req.user?.userId,
+  });
+
+  // ✅ Eğer files gelmiyorsa
+  if (!req.files || req.files.length === 0) {
+    console.warn('⚠️ No files uploaded');
+  }
+
       const categoryExists = await Category.findById(category);
       if (!categoryExists) {
         return res.status(httpStatus.BAD_REQUEST).json(
@@ -235,7 +249,7 @@ class ProductController {
 
     });
     try {
-      await product.save();
+      const savedProduct = await product.save();
       try {
       const inventoryPayload = {
         orderId: `product_init_${savedProduct._id}`, // Benzersiz bir ID
