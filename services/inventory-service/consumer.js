@@ -14,46 +14,38 @@ async function startConsumers() {
 
     const consumersToStart = [
       {
-        queue: 'order.created', // Sipariş Oluşturuldu -> Stok Rezerve Et
+        queue: 'order.created',
         handler: InventoryController.handleReserveStock,
-        options: { durable: true, prefetch: 1, requeueOnError: false } // Tek tek işle, hata olursa tekrar deneme
+        options: { durable: true, prefetch: 1, requeueOnError: false }
       },
       {
-        queue: 'order.cancelled', // Sipariş İptal Edildi -> Stoğu Serbest Bırak
+        queue: 'order.cancelled',
         handler: InventoryController.handleReleaseStock,
-        options: { durable: true, prefetch: 5, requeueOnError: true } // Hata olursa tekrar dene? Belki false olmalı?
+        options: { durable: true, prefetch: 5, requeueOnError: true }
       },
       {
-        queue: 'payment.failed', // Ödeme Başarısız -> Stoğu Serbest Bırak
-        handler: InventoryController.handleReleaseStock, // Aynı fonksiyonu kullanabilir
-        options: { durable: true, prefetch: 5, requeueOnError: true } // Hata olursa tekrar dene? Belki false olmalı?
+        queue: 'payment.failed',
+        handler: InventoryController.handleReleaseStock,
+        options: { durable: true, prefetch: 5, requeueOnError: true }
       },
       {
-        queue: 'payment.completed', // Ödeme Tamamlandı -> Stoğu Kesinleştir
+        queue: 'payment.completed',
         handler: InventoryController.handleCommitStock,
-        options: { durable: true, prefetch: 1, requeueOnError: false } // Tek tek işle, hata olursa tekrar deneme (ÇOK DİKKATLİ OL!)
+        options: { durable: true, prefetch: 1, requeueOnError: false }
       },
-      // === İLERİ SEVİYE / OPSİYONEL ===
-      // {
-      //   queue: 'product.created', // Yeni ürün eklendi -> Stok kaydı oluştur
-      //   handler: InventoryController.handleProductCreated, // Bu fonksiyon yazılmalı
-      //   options: { durable: true }
-      // },
-      // {
-      //   queue: 'product.deleted', // Ürün silindi -> Stok kaydını sil
-      //   handler: InventoryController.handleProductDeleted, // Bu fonksiyon yazılmalı
-      //   options: { durable: true }
-      // }
+      // ✅ YENİ: Ürün stok artırma eventi
+      {
+        queue: 'product.stock.increase',
+        handler: InventoryController.handleStockIncrease,
+        options: { durable: true, prefetch: 5, requeueOnError: true }
+      }
     ];
 
-    // Shared-utils'daki consumeMultiple helper'ını kullanalım
     await consumer.consumeMultiple(consumersToStart);
-
     logger.info(`✅ [Inventory Consumer] ${consumersToStart.length} consumers started successfully.`);
 
   } catch (error) {
     logger.error('❌ Failed to start Inventory Service consumers:', error);
-    // Consumer'lar olmadan servis çalışmamalı. Uygulamayı durdur.
     process.exit(1);
   }
 }

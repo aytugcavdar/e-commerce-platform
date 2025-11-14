@@ -344,6 +344,43 @@ class InventoryController {
         }
    });
 
+   static async handleStockIncrease(payload) {
+  const { orderId, items } = payload;
+  logger.info(`Received stock increase request from ${orderId}`);
+
+  try {
+    const updates = items.map(async (item) => {
+      // Ürün için inventory kaydı var mı kontrol et
+      const inventory = await Inventory.findOne({ 
+        productId: new mongoose.Types.ObjectId(item.productId) 
+      });
+
+      if (inventory) {
+        // ✅ Kayıt varsa stok artır
+        inventory.stockQuantity += item.quantity;
+        await inventory.save();
+        logger.info(`Stock increased for product ${item.productId}: +${item.quantity}. New stock: ${inventory.stockQuantity}`);
+      } else {
+        // ✅ Kayıt yoksa yeni oluştur
+        const newInventory = new Inventory({
+          productId: new mongoose.Types.ObjectId(item.productId),
+          stockQuantity: item.quantity,
+          reservedQuantity: 0,
+          lowStockThreshold: 5 // Varsayılan eşik
+        });
+        await newInventory.save();
+        logger.info(`New inventory record created for product ${item.productId} with stock: ${item.quantity}`);
+      }
+    });
+
+    await Promise.all(updates);
+    logger.info(`✅ Stock increase completed for ${orderId}`);
+
+  } catch (error) {
+    logger.error(`❌ Stock increase failed for ${orderId}:`, error.message);
+  }
+}
+
 } // InventoryController sonu
 
 module.exports = InventoryController;
