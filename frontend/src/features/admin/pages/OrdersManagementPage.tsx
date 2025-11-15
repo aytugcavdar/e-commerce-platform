@@ -37,8 +37,8 @@ interface Order {
     lastName: string;
     email: string;
   };
-  orderItems: OrderItem[]; // 'items' -> 'orderItems' olarak düzeltildi
-  totalPrice: number;
+  items: OrderItem[]; // ✅ 'orderItems' -> 'items' olarak düzeltildi
+  total: number;       // ✅ 'totalPrice' -> 'total' olarak düzeltildi
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   shippingAddress: {
     fullName: string;
@@ -230,10 +230,10 @@ const AdminOrdersPage = () => {
                       {/* ================================================= */}
                       {/* DÜZELTME 2: 'items' -> 'orderItems'               */}
                       {/* ================================================= */}
-                      {order.orderItems?.length ?? 0} ürün
+                      {order.items?.length ?? 0} ürün
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {formatCurrency(order.totalPrice)}
+                      {formatCurrency(order.total)}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig[order.status].color}`}>
@@ -326,7 +326,7 @@ const AdminOrdersPage = () => {
                   {/* ================================================= */}
                   {/* DÜZELTME 3: 'items' -> 'orderItems'               */}
                   {/* ================================================= */}
-                  {selectedOrder.orderItems.map((item, index) => (
+                  {selectedOrder.items.map((item, index) => (
                     <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
                       {/* ================================================= */}
                       {/* DÜZELTME 4: Ürün detayları düzeltildi              */}
@@ -353,18 +353,18 @@ const AdminOrdersPage = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-semibold text-gray-900">Toplam</span>
                   <span className="text-xl font-bold text-blue-600">
-                    {formatCurrency(selectedOrder.totalPrice)}
+                    {formatCurrency(selectedOrder.total)}
                   </span>
                 </div>
               </div>
 
-              {/* Durum Güncelleme */}
+              {/* Durum Güncelleme */}              
               {statusConfig[selectedOrder.status].next && (
                 <div className="mt-6">
                   <Button
                     fullWidth
                     onClick={() => {
-                      updateOrderStatus(selectedOrder._id, statusConfig[selectedDOrder.status].next!);
+                      updateOrderStatus(selectedOrder._id, statusConfig[selectedOrder.status].next!);
                       setDetailModalOpen(false);
                     }}
                   >

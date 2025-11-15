@@ -9,20 +9,6 @@ import { Button } from '@/shared/components/ui/base';
 import { Loading, ErrorMessage } from '@/shared/components/ui/feedback';
 import { ORDER_STATUS_MAP } from '../types/order.types';
 
-/**
- * 🎓 ÖĞREN: OrderDetailPage
- * 
- * Tek bir siparişin detayını gösteren sayfa.
- * 
- * Özellikler:
- * - Sipariş bilgileri
- * - Ürün listesi
- * - Teslimat adresi
- * - Ödeme bilgisi
- * - Sipariş durumu takibi
- * - İptal butonu
- */
-
 const OrderDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -37,22 +23,15 @@ const OrderDetailPage = () => {
 
   const [isCancelling, setIsCancelling] = useState(false);
 
-  /**
-   * 📋 Sipariş Detayını Yükle
-   */
   useEffect(() => {
     if (id) {
       loadOrderDetails(id);
     }
-
     return () => {
       clearOrder();
     };
-  }, [id, loadOrderDetails, clearOrder]);
+  }, [id]);
 
-  /**
-   * 🚫 Sipariş İptal
-   */
   const handleCancelOrder = async () => {
     if (!order) return;
 
@@ -61,9 +40,7 @@ const OrderDetailPage = () => {
     }
 
     setIsCancelling(true);
-
     const result = await cancelOrderById(order._id);
-
     setIsCancelling(false);
 
     if (result.success) {
@@ -73,9 +50,6 @@ const OrderDetailPage = () => {
     }
   };
 
-  /**
-   * 🔄 Loading State
-   */
   if (loadingDetails) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -84,9 +58,6 @@ const OrderDetailPage = () => {
     );
   }
 
-  /**
-   * ❌ Error State
-   */
   if (orderError) {
     return (
       <Container className="py-20">
@@ -104,9 +75,6 @@ const OrderDetailPage = () => {
     );
   }
 
-  /**
-   * 🚫 Sipariş Bulunamadı
-   */
   if (!order) {
     return (
       <Container className="py-20">
@@ -123,9 +91,8 @@ const OrderDetailPage = () => {
   }
 
   const statusInfo = ORDER_STATUS_MAP[order.status];
-  const canCancel = ['pending', 'confirmed', 'preparing'].includes(order.status);
+  const canCancel = ['pending', 'confirmed', 'processing'].includes(order.status);
 
-  // Tarih formatlama
   const orderDate = new Date(order.createdAt).toLocaleDateString('tr-TR', {
     day: 'numeric',
     month: 'long',
@@ -134,38 +101,41 @@ const OrderDetailPage = () => {
     minute: '2-digit',
   });
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('tr-TR', {
+      style: 'currency',
+      currency: 'TRY',
+    }).format(amount);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <Container>
-        {/* 🍞 Breadcrumb */}
+        {/* Breadcrumb */}
         <nav className="mb-6 flex items-center space-x-2 text-sm text-gray-500">
           <Link to="/" className="hover:text-blue-600">Ana Sayfa</Link>
           <span>›</span>
           <Link to="/orders" className="hover:text-blue-600">Siparişlerim</Link>
           <span>›</span>
-          <span className="text-gray-900">
-            {order.orderNumber || `#${order._id.slice(-8)}`}
-          </span>
+          <span className="text-gray-900">{order.orderNumber}</span>
         </nav>
 
-        {/* 📊 Başlık ve Durum */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Sipariş {order.orderNumber || `#${order._id.slice(-8)}`}
+              Sipariş {order.orderNumber}
             </h1>
             <p className="text-gray-600">{orderDate}</p>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Durum Badge */}
             <span
               className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-${statusInfo.color}-100 text-${statusInfo.color}-800`}
             >
               {statusInfo.icon} {statusInfo.label}
             </span>
 
-            {/* İptal Butonu */}
             {canCancel && (
               <Button
                 onClick={handleCancelOrder}
@@ -182,7 +152,7 @@ const OrderDetailPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Sol: Ürünler ve Adres */}
           <div className="lg:col-span-2 space-y-6">
-            {/* 📦 Ürünler */}
+            {/* Ürünler */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-6">
                 Sipariş Edilen Ürünler
@@ -194,7 +164,6 @@ const OrderDetailPage = () => {
                     key={index}
                     className="flex gap-4 pb-4 border-b border-gray-200 last:border-0 last:pb-0"
                   >
-                    {/* Ürün Resmi */}
                     <Link
                       to={`/products/${item.slug}`}
                       className="flex-shrink-0 w-20 h-20 bg-gray-100 rounded-lg overflow-hidden"
@@ -207,24 +176,13 @@ const OrderDetailPage = () => {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <svg
-                            className="w-8 h-8 text-gray-300"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
+                          <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
                         </div>
                       )}
                     </Link>
 
-                    {/* Ürün Bilgileri */}
                     <div className="flex-1">
                       <Link
                         to={`/products/${item.slug}`}
@@ -237,19 +195,12 @@ const OrderDetailPage = () => {
                       </p>
                     </div>
 
-                    {/* Fiyat */}
                     <div className="text-right">
                       <p className="font-bold text-gray-900">
-                        {item.price.toLocaleString('tr-TR', {
-                          style: 'currency',
-                          currency: 'TRY',
-                        })}
+                        {formatCurrency(item.price)}
                       </p>
                       <p className="text-sm text-gray-500 mt-1">
-                        Toplam: {item.subtotal.toLocaleString('tr-TR', {
-                          style: 'currency',
-                          currency: 'TRY',
-                        })}
+                        Toplam: {formatCurrency(item.subtotal)}
                       </p>
                     </div>
                   </div>
@@ -257,7 +208,7 @@ const OrderDetailPage = () => {
               </div>
             </div>
 
-            {/* 🚚 Teslimat Adresi */}
+            {/* Teslimat Adresi */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
                 Teslimat Adresi
@@ -274,7 +225,7 @@ const OrderDetailPage = () => {
               </div>
             </div>
 
-            {/* 📦 Kargo Takip */}
+            {/* Kargo Takip */}
             {order.trackingNumber && (
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">
@@ -286,10 +237,8 @@ const OrderDetailPage = () => {
                     <p className="font-mono font-semibold text-gray-900">
                       {order.trackingNumber}
                     </p>
-                    {order.shippingCompany && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        {order.shippingCompany}
-                      </p>
+                    {order.carrier && (
+                      <p className="text-sm text-gray-500 mt-1">{order.carrier}</p>
                     )}
                   </div>
                   <Button variant="outline" size="sm">
@@ -310,47 +259,29 @@ const OrderDetailPage = () => {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-gray-700">
                   <span>Ara Toplam</span>
-                  <span className="font-medium">
-                    {order.itemsPrice.toLocaleString('tr-TR', {
-                      style: 'currency',
-                      currency: 'TRY',
-                    })}
-                  </span>
+                  <span className="font-medium">{formatCurrency(order.subtotal)}</span>
                 </div>
 
                 <div className="flex justify-between text-gray-700">
                   <span>Kargo</span>
                   <span className="font-medium">
-                    {order.shippingPrice === 0 ? (
+                    {order.shippingCost === 0 ? (
                       <span className="text-green-600">Ücretsiz</span>
                     ) : (
-                      order.shippingPrice.toLocaleString('tr-TR', {
-                        style: 'currency',
-                        currency: 'TRY',
-                      })
+                      formatCurrency(order.shippingCost)
                     )}
                   </span>
                 </div>
 
                 <div className="flex justify-between text-gray-700">
                   <span>KDV</span>
-                  <span className="font-medium">
-                    {order.taxPrice.toLocaleString('tr-TR', {
-                      style: 'currency',
-                      currency: 'TRY',
-                    })}
-                  </span>
+                  <span className="font-medium">{formatCurrency(order.tax)}</span>
                 </div>
 
-                {order.discountPrice > 0 && (
+                {order.discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>İndirim</span>
-                    <span className="font-medium">
-                      -{order.discountPrice.toLocaleString('tr-TR', {
-                        style: 'currency',
-                        currency: 'TRY',
-                      })}
-                    </span>
+                    <span className="font-medium">-{formatCurrency(order.discount)}</span>
                   </div>
                 )}
 
@@ -358,12 +289,7 @@ const OrderDetailPage = () => {
 
                 <div className="flex justify-between text-lg font-bold text-gray-900">
                   <span>Toplam</span>
-                  <span className="text-2xl">
-                    {order.totalPrice.toLocaleString('tr-TR', {
-                      style: 'currency',
-                      currency: 'TRY',
-                    })}
-                  </span>
+                  <span className="text-2xl">{formatCurrency(order.total)}</span>
                 </div>
               </div>
 

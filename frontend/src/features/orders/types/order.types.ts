@@ -1,143 +1,185 @@
 // frontend/src/features/orders/types/order.types.ts
 
-import type { User } from '@/features/auth/types/auth.types';
-
 /**
- * 🎓 ÖĞREN: Sipariş Tipleri
- *
- * Sipariş (Order) yapısı, bir işlemin (transaction) tüm bileşenlerini içerir:
- * 1. Kimin verdiği (User)
- * 2. Neler aldığı (OrderItems)
- * 3. Nereye gönderileceği (ShippingAddress)
- * 4. Nasıl ödendiği (Payment)
- * 5. Mevcut durumu (Status)
+ * 🎓 ÖĞREN: Sipariş Tipleri (Güncellenmiş)
  */
 
 /**
- * 📦 OrderItem
- *
- * Sipariş verildiği andaki ürün bilgisi.
- * Fiyatın değişme ihtimaline karşı, o anki fiyatı kaydeder.
+ * 📦 Order Item
  */
 export interface OrderItem {
-  productId: string;
+  product: string;
   name: string;
-  image: string;
-  price: number; // Sipariş anındaki fiyat
+  slug: string;
   quantity: number;
+  price: number;
+  discountPrice?: number;
+  image: string;
+  subtotal: number;
 }
 
 /**
- * 🚚 ShippingAddress
- *
- * Teslimat adresi yapısı.
+ * 🚚 Shipping Address
  */
 export interface ShippingAddress {
   fullName: string;
+  phone: string;
   address: string;
   city: string;
+  district: string;
   postalCode: string;
   country: string;
-  phone?: string;
 }
 
 /**
- * 💳 PaymentResult
- *
- * Ödeme sağlayıcıdan (Stripe, Iyzico vb.) dönen sonuç.
+ * 💳 Payment Method
  */
-export interface PaymentResult {
-  id: string; // Ödeme ID'si
-  status: string; // 'succeeded', 'pending', 'failed'
-  update_time: string;
-  email_address?: string;
+export type PaymentMethodType = 'credit_card' | 'debit_card' | 'bank_transfer' | 'cash_on_delivery';
+
+export interface PaymentMethod {
+  type: PaymentMethodType;
+  cardNumber?: string;
+  cardBrand?: string;
 }
 
 /**
- * 🚦 OrderStatus
- *
- * Siparişin yaşam döngüsündeki durumlar.
+ * 🚦 Order Status
  */
 export type OrderStatus =
-  | 'pending' // Ödeme bekleniyor
-  | 'paid' // Ödendi
-  | 'shipped' // Kargolandı
-  | 'delivered' // Teslim edildi
-  | 'cancelled'; // İptal edildi
+  | 'pending'
+  | 'confirmed'
+  | 'processing'
+  | 'shipped'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'cancelled'
+  | 'returned'
+  | 'refunded';
+
+/**
+ * 💰 Payment Status
+ */
+export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
+
+/**
+ * 🎨 Status Config (UI için)
+ */
+export const ORDER_STATUS_MAP: Record<OrderStatus, { label: string; color: string; icon: string }> = {
+  pending: { label: 'Beklemede', color: 'yellow', icon: '⏳' },
+  confirmed: { label: 'Onaylandı', color: 'blue', icon: '✅' },
+  processing: { label: 'Hazırlanıyor', color: 'blue', icon: '📦' },
+  shipped: { label: 'Kargoda', color: 'purple', icon: '🚚' },
+  out_for_delivery: { label: 'Dağıtımda', color: 'purple', icon: '🚛' },
+  delivered: { label: 'Teslim Edildi', color: 'green', icon: '✅' },
+  cancelled: { label: 'İptal Edildi', color: 'red', icon: '❌' },
+  returned: { label: 'İade Edildi', color: 'orange', icon: '↩️' },
+  refunded: { label: 'İade Edildi', color: 'gray', icon: '💰' },
+};
 
 /**
  * 📄 Order (Ana Sipariş Modeli)
- *
- * Backend'den gelen ana sipariş objesi.
  */
 export interface Order {
   _id: string;
-  user: User | string; // Populated (dolu) veya sadece ID
-  orderItems: OrderItem[];
-  shippingAddress: ShippingAddress;
-  paymentMethod: string; // 'credit_card', 'paypal'
-  paymentResult?: PaymentResult;
-
-  itemsPrice: number; // Ürünlerin toplam fiyatı
-  shippingPrice: number; // Kargo ücreti
-  taxPrice: number; // Vergi
-  totalPrice: number; // Toplam
-
+  orderNumber: string;
+  user: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  items: OrderItem[];
+  
+  // Pricing
+  subtotal: number;
+  shippingCost: number;
+  tax: number;
+  discount: number;
+  total: number;
+  
+  // Addresses
+  shippingAddress: {
+    fullName: string;
+    phone: string;
+    address: string;
+    city: string;
+    district: string;
+    postalCode: string;
+    country: string;
+  };
+  
+  // Payment
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  
+  // Status
   status: OrderStatus;
   
-  paidAt?: string | Date;
-  shippedAt?: string | Date;
-  deliveredAt?: string | Date;
-
-  createdAt: string | Date;
-  updatedAt: string | Date;
+  // Shipping
+  trackingNumber?: string;
+  carrier?: string;
+  
+  // Dates
+  createdAt: string;
+  updatedAt: string;
+  confirmedAt?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
 }
 
 /**
- * 📊 OrderState
- *
- * Siparişlerin Redux slice'ı için state yapısı.
+ * 📊 Orders State
  */
-export interface OrderState {
-  orders: Order[]; // Kullanıcının tüm siparişleri
-  selectedOrder: Order | null; // Sipariş detay sayfasında bakılan
-  loading: boolean; // Sipariş listesi yükleniyor
-  loadingDetails: boolean; // Sipariş detayı yükleniyor
+export interface OrdersState {
+  orders: Order[];
+  selectedOrder: Order | null;
+  loading: boolean;
+  loadingDetails: boolean;
+  creatingOrder: boolean;
   error: string | null;
-
-  // Checkout (Ödeme) süreci için
-  checkoutLoading: boolean;
-  checkoutError: string | null;
-  checkoutSuccess: boolean;
+  orderError: string | null;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  filters: {
+    status?: OrderStatus;
+    search?: string;
+  };
 }
 
-export const ORDER_STATUS_MAP: Record<
-  OrderStatus,
-  { label: string; icon: string; color: string }
-> = {
-  pending: {
-    label: 'Ödeme Bekleniyor',
-    icon: '🕒',
-    color: 'yellow',
-  },
-  paid: {
-    label: 'Ödendi',
-    icon: '✅',
-    color: 'green',
-  },
-  shipped: {
-    label: 'Kargolandı',
-    icon: '🚚',
-    color: 'blue',
-  },
-  delivered: {
-    label: 'Teslim Edildi',
-    icon: '📦',
-    color: 'purple',
-  },
-  cancelled: {
-    label: 'İptal Edildi',
-    icon: '❌',
-    color: 'red',
-  },
-};
+/**
+ * 🛒 Create Order Request
+ */
+export interface CreateOrderRequest {
+  items: Array<{
+    product: string;
+    quantity: number;
+  }>;
+  shippingAddress: {
+    fullName: string;
+    phone: string;
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+  };
+  paymentMethod: PaymentMethodType;
+  couponCode?: string;
+  notes?: string;
+}
+
+/**
+ * 📤 Create Order Response
+ */
+export interface CreateOrderResponse {
+  success: boolean;
+  data: {
+    order: Order;
+  };
+  message: string;
+}

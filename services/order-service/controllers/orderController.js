@@ -272,7 +272,7 @@ class OrderController {
     const userId = req.user.userId;
     const isAdmin = req.user.role === 'admin';
 
-    const order = await Order.findById(id).populate('user', 'firstName lastName email phone');
+    const order = await Order.findById(id);
 
     if (!order) {
       return res.status(httpStatus.NOT_FOUND).json(
@@ -281,7 +281,7 @@ class OrderController {
     }
 
     // Check if user owns the order or is admin
-    if (order.user._id.toString() !== userId && !isAdmin) {
+    if (order.user.toString() !== userId && !isAdmin) {
       return res.status(httpStatus.FORBIDDEN).json(
         ResponseFormatter.error(errorMessages.FORBIDDEN, httpStatus.FORBIDDEN)
       );
@@ -466,7 +466,7 @@ class OrderController {
       logger.warn('Failed to publish order.status_updated event:', error);
     }
 
-    await order.populate('user', 'firstName lastName email');
+    
 
     res.status(httpStatus.OK).json(
       ResponseFormatter.success(order, 'Sipariş durumu güncellendi')
