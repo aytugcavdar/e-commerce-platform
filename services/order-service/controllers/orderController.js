@@ -106,11 +106,11 @@ class OrderController {
 }
 
   // 3️⃣ ✅ INVENTORY SERVICE - Stok Kontrolü (DÜZELTME)
-  try {
+ try {
     logger.info('[OrderService] Checking stock with Inventory Service...');
     
     const checkStockResponse = await axios.post(
-      `${process.env.INVENTORY_SERVICE_URL}/api/inventory/check-bulk`,  // ✅ Doğru URL
+      `${process.env.INVENTORY_SERVICE_URL}/api/inventory/check-bulk`,
       { 
         items: items.map(i => ({ 
           productId: i.product, 
@@ -119,13 +119,16 @@ class OrderController {
       }
     );
 
-    if (!checkStockResponse.data?.success || !checkStockResponse.data?.data?.allAvailable) {
-      logger.warn('[OrderService] Stock check failed:', checkStockResponse.data?.data?.unavailableItems);
+    // ✅ DÜZELTME: ResponseFormatter'ın döndürdüğü format
+    const responseData = checkStockResponse.data;
+    
+    if (responseData.status !== 'success' || !responseData.data?.allAvailable) {
+      logger.warn('[OrderService] Stock check failed:', responseData.data?.unavailableItems);
       return res.status(httpStatus.BAD_REQUEST).json(
         ResponseFormatter.error(
           'Yetersiz stok', 
           httpStatus.BAD_REQUEST,
-          checkStockResponse.data?.data?.unavailableItems
+          responseData.data?.unavailableItems
         )
       );
     }

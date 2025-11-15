@@ -19,7 +19,7 @@ class InventoryController {
    * @access Private (Servisler arası iletişim)
    * @body { items: [{ productId: "...", quantity: 1 }, ...] }
    */
-  static checkStockBulk = asyncHandler(async (req, res, next) => {
+   static checkStockBulk = asyncHandler(async (req, res, next) => {
     const { items } = req.body; // [{ productId, quantity }]
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -41,7 +41,7 @@ class InventoryController {
       const record = inventoryRecords.find(inv => inv.productId.toString() === item.productId.toString());
       
       // Modeldeki virtual'ı (availableQuantity) kullanalım
-      const available = record ? record.availableQuantity : 0; 
+      const available = record ? (record.stockQuantity - record.reservedQuantity) : 0;
 
       if (!record || available < item.quantity) {
         allAvailable = false;

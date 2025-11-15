@@ -1,7 +1,4 @@
-
 const mongoose = require('mongoose');
-
-
 
 const orderItemSchema = new mongoose.Schema({
   product: {
@@ -37,7 +34,8 @@ const orderSchema = new mongoose.Schema({
   orderNumber: {
     type: String,
     unique: true,
-    required: true
+    // ✅ DÜZELTME: required: false yapıyoruz, middleware oluşturacak
+    required: false
   },
 
   // User information
@@ -125,15 +123,15 @@ const orderSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: [
-      'pending',           // Sipariş oluşturuldu
-      'confirmed',         // Sipariş onaylandı
-      'processing',        // Hazırlanıyor
-      'shipped',           // Kargoya verildi
-      'out_for_delivery',  // Dağıtımda
-      'delivered',         // Teslim edildi
-      'cancelled',         // İptal edildi
-      'returned',          // İade edildi
-      'refunded'           // İade tamamlandı
+      'pending',
+      'confirmed',
+      'processing',
+      'shipped',
+      'out_for_delivery',
+      'delivered',
+      'cancelled',
+      'returned',
+      'refunded'
     ],
     default: 'pending',
     index: true
@@ -158,8 +156,8 @@ const orderSchema = new mongoose.Schema({
 
   // Shipping information
   shipping: {
-    carrier: String,        // Kargo firması
-    trackingNumber: String, // Takip numarası
+    carrier: String,
+    trackingNumber: String,
     estimatedDelivery: Date,
     actualDelivery: Date,
     shippingMethod: {
@@ -180,8 +178,8 @@ const orderSchema = new mongoose.Schema({
   },
 
   // Additional information
-  notes: String,           // Müşteri notu
-  internalNotes: String,   // Admin notu
+  notes: String,
+  internalNotes: String,
   
   // Cancellation
   cancellationReason: String,
@@ -202,6 +200,47 @@ const orderSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
+// ✅ CRITICAL: Pre-save middleware MODELİN ÜZERİNDE TANIMLANMALI
+orderSchema.pre('save', async function(next) {
+  try {
+    // Sadece yeni kayıtlarda ve orderNumber yoksa çalış
+    if (this.isNew && !this.orderNumber) {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      const datePrefix = `ORD-${year}${month}${day}-`;
+      
+      // Bugünkü son siparişi bul
+      const lastOrder = await this.constructor
+        .findOne({ orderNumber: { $regex: `^${datePrefix}` } })
+        .sort({ createdAt: -1 })
+        .select('orderNumber')
+        .lean();
+
+      let sequence = 1;
+      if (lastOrder && lastOrder.orderNumber) {
+        try {
+          const parts = lastOrder.orderNumber.split('-');
+          const lastSequence = parseInt(parts[parts.length - 1]);
+          if (!isNaN(lastSequence)) {
+            sequence = lastSequence + 1;
+          }
+        } catch (e) {
+          console.warn('Could not parse last order sequence, starting from 1');
+        }
+      }
+
+      this.orderNumber = `${datePrefix}${String(sequence).padStart(4, '0')}`;
+      console.log(`✅ Generated orderNumber: ${this.orderNumber}`);
+    }
+    next();
+  } catch (error) {
+    console.error('❌ Error generating orderNumber:', error);
+    next(error);
+  }
+});
+
 // Virtual for items count
 orderSchema.virtual('itemsCount').get(function() {
   return this.items.reduce((total, item) => total + item.quantity, 0);
@@ -219,42 +258,7 @@ orderItemSchema.virtual('itemTotal').get(function() {
 
 // Indexes
 orderSchema.index({ user: 1, createdAt: -1 });
-
 orderSchema.index({ status: 1, createdAt: -1 });
-
-
-
-orderSchema.pre('save', async function(next) {
-  
-  if (this.isNew && !this.orderNumber) {
-    const today = new Date();
-    
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const datePrefix = `ORD-${year}${month}${day}-`; 
-    
-    const lastOrder = await this.constructor
-      .findOne({ orderNumber: { $regex: `^${datePrefix}` } }) 
-      .sort({ createdAt: -1 }) 
-      .select('orderNumber');
-
-    let sequence = 1;
-    if (lastOrder && lastOrder.orderNumber) {
-      try {
-        const lastSequence = parseInt(lastOrder.orderNumber.split('-').pop());
-        sequence = lastSequence + 1;
-      } catch (e) {
-         logger.warn('Could not parse last order sequence, starting from 1.');
-         sequence = 1; 
-      }
-    }
-
-    
-    this.orderNumber = `${datePrefix}${String(sequence).padStart(4, '0')}`;
-  }
-  next();
-});
 
 // Pre-save middleware - Add to status history
 orderSchema.pre('save', function(next) {
