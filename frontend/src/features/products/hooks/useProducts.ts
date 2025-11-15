@@ -21,10 +21,11 @@ import {
 import type { ProductFilters, ProductSortOption } from '../types/product.types';
 
 /**
- * 🎯 USE PRODUCTS HOOK
+ * 🎯 USE PRODUCTS HOOK (Debug Ekli)
  * 
- * Products feature için tüm işlemleri yöneten custom hook.
- * Component'lerde kullanımı kolaylaştırır.
+ * Değişiklikler:
+ * 1. ✅ Console log'lar eklendi
+ * 2. ✅ Error handling iyileştirildi
  */
 export const useProducts = () => {
   const dispatch = useAppDispatch();
@@ -47,15 +48,28 @@ export const useProducts = () => {
   /**
    * 📋 LOAD PRODUCTS - Ürünleri Yükle
    * 
-   * Aktif filtrelerle ürünleri getirir.
+   * ✅ FİX: Console log eklendi
    */
   const loadProducts = useCallback(
     async (customFilters?: ProductFilters) => {
       const filtersToUse = customFilters || activeFilters;
-      const result = await dispatch(fetchProducts(filtersToUse));
-      return fetchProducts.fulfilled.match(result)
-        ? { success: true, data: result.payload }
-        : { success: false, error: result.payload as string };
+      
+      console.log('📋 Loading products with filters:', filtersToUse);
+      
+      try {
+        const result = await dispatch(fetchProducts(filtersToUse));
+        
+        if (fetchProducts.fulfilled.match(result)) {
+          console.log('✅ Products loaded:', result.payload.products.length, 'items');
+          return { success: true, data: result.payload };
+        } else {
+          console.error('❌ Products loading failed:', result.payload);
+          return { success: false, error: result.payload as string };
+        }
+      } catch (error) {
+        console.error('❌ Products loading exception:', error);
+        return { success: false, error: 'Beklenmeyen bir hata oluştu' };
+      }
     },
     [dispatch, activeFilters]
   );
@@ -114,11 +128,10 @@ export const useProducts = () => {
 
   /**
    * 🔍 UPDATE FILTERS - Filtreleri Güncelle
-   * 
-   * Kullanıcı filtreleri değiştirdiğinde çağrılır.
    */
   const updateFilters = useCallback(
     (newFilters: Partial<ProductFilters>) => {
+      console.log('🔍 Updating Redux filters:', newFilters);
       dispatch(setFilters(newFilters));
     },
     [dispatch]
@@ -126,10 +139,9 @@ export const useProducts = () => {
 
   /**
    * 🔄 APPLY FILTERS - Filtreleri Uygula ve Ürünleri Getir
-   * 
-   * "Filtrele" butonuna basıldığında çağrılır.
    */
   const apply = useCallback(async () => {
+    console.log('🔄 Applying filters and loading products');
     dispatch(applyFilters());
     return loadProducts(filters);
   }, [dispatch, filters, loadProducts]);
@@ -138,6 +150,7 @@ export const useProducts = () => {
    * ❌ RESET FILTERS - Filtreleri Sıfırla
    */
   const reset = useCallback(() => {
+    console.log('❌ Resetting filters');
     dispatch(clearFilters());
     loadProducts({
       page: 1,
@@ -151,6 +164,7 @@ export const useProducts = () => {
    */
   const changePage = useCallback(
     async (page: number) => {
+      console.log('📄 Changing page to:', page);
       dispatch(setPage(page));
       return loadProducts({ ...activeFilters, page });
     },
@@ -162,6 +176,7 @@ export const useProducts = () => {
    */
   const changeSort = useCallback(
     async (sort: ProductSortOption) => {
+      console.log('📊 Changing sort to:', sort);
       dispatch(setSort(sort));
       return loadProducts({ ...activeFilters, sort, page: 1 });
     },
@@ -222,103 +237,13 @@ export const useProducts = () => {
 };
 
 /**
- * 🎯 KULLANIM ÖRNEĞİ:
+ * 💡 DEBUG TİPLERİ:
  * 
- * // ProductsPage içinde:
- * import { useProducts } from '@/features/products/hooks/useProducts';
+ * Console'da şunları göreceksin:
  * 
- * const ProductsPage = () => {
- *   const {
- *     products,
- *     loading,
- *     filters,
- *     pagination,
- *     updateFilters,
- *     applyFilters,
- *     changePage,
- *   } = useProducts();
- *   
- *   // İlk yüklemede ürünleri getir
- *   useEffect(() => {
- *     applyFilters();
- *   }, []);
- *   
- *   // Kategori değiştir
- *   const handleCategoryChange = (categoryId: string) => {
- *     updateFilters({ category: categoryId });
- *   };
- *   
- *   // Filtreleri uygula
- *   const handleApply = () => {
- *     applyFilters();
- *   };
- *   
- *   // Sayfa değiştir
- *   const handlePageChange = (page: number) => {
- *     changePage(page);
- *   };
- *   
- *   return (
- *     <div>
- *       <Filters onChange={handleCategoryChange} />
- *       <button onClick={handleApply}>Filtrele</button>
- *       {loading ? <Loading /> : <ProductList products={products} />}
- *       <Pagination {...pagination} onChange={handlePageChange} />
- *     </div>
- *   );
- * };
+ * 📋 Loading products with filters: { page: 1, limit: 20, search: "iPhone" }
+ * ✅ Products loaded: 15 items
  * 
- * // ProductDetailPage içinde:
- * const ProductDetailPage = () => {
- *   const { slug } = useParams();
- *   const {
- *     selectedProduct,
- *     loadingProduct,
- *     relatedProducts,
- *     loadProductBySlug,
- *     loadRelated,
- *   } = useProducts();
- *   
- *   useEffect(() => {
- *     if (slug) {
- *       loadProductBySlug(slug).then((result) => {
- *         if (result.success) {
- *           loadRelated(result.data._id);
- *         }
- *       });
- *     }
- *   }, [slug]);
- *   
- *   if (loadingProduct) return <Loading />;
- *   if (!selectedProduct) return <NotFound />;
- *   
- *   return (
- *     <div>
- *       <ProductDetail product={selectedProduct} />
- *       <RelatedProducts products={relatedProducts} />
- *     </div>
- *   );
- * };
- */
-
-/**
- * 💡 PRO TIP: Custom Hooks Composition
- * 
- * Birden fazla hook birleştirilebilir:
- * 
- * const ProductsPageLogic = () => {
- *   const products = useProducts();
- *   const cart = useCart();
- *   const auth = useAuth();
- *   
- *   const handleAddToCart = (product: Product) => {
- *     if (!auth.isAuthenticated) {
- *       toast.error('Lütfen giriş yapın');
- *       return;
- *     }
- *     cart.addItem(product);
- *   };
- *   
- *   return { ...products, handleAddToCart };
- * };
+ * Veya hata varsa:
+ * ❌ Products loading failed: "Network error"
  */

@@ -127,13 +127,13 @@ export interface ProductFilters {
  * 📊 PRODUCT SORT OPTIONS - Sıralama Seçenekleri
  */
 export type ProductSortOption = 
-  | 'newest'           // En yeni
-  | 'oldest'           // En eski
-  | 'price-asc'        // Fiyat: Düşükten yükseğe
-  | 'price-desc'       // Fiyat: Yüksekten düşüğe
-  | 'name-asc'         // İsim: A-Z
-  | 'name-desc'        // İsim: Z-A
-  | 'popular';         // En popüler (satış sayısına göre)
+  | 'newest'           // En yeni (createdAt: -1)
+  | 'oldest'           // En eski (createdAt: 1)
+  | 'price-asc'        // Fiyat: Düşükten yükseğe (price: 1)
+  | 'price-desc'       // Fiyat: Yüksekten düşüğe (price: -1)
+  | 'name-asc'         // İsim: A-Z (name: 1)
+  | 'name-desc'        // İsim: Z-A (name: -1)
+  | 'popular';         // En popüler (salesCount: -1)
 
 /**
  * 📄 PAGINATION INFO - Sayfalama Bilgisi
@@ -197,6 +197,8 @@ export interface FetchProductResponse {
   data: Product;
   message?: string;
 }
+
+
 
 /**
  * 🎯 KULLANIM ÖRNEKLERİ:

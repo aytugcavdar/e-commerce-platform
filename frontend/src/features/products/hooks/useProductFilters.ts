@@ -5,21 +5,14 @@ import { useSearchParams } from 'react-router-dom';
 import type { ProductFilters, ProductSortOption } from '../types/product.types';
 
 /**
- * 🎓 ÖĞREN: useProductFilters Hook
+ * 🎓 ÖĞREN: useProductFilters Hook (Düzeltilmiş)
  * 
  * Bu hook, ürün filtreleme işlemlerini yönetir ve URL ile senkronize eder.
  * 
- * Sorumlulukları:
- * 1. Filtreleri state'te tut
- * 2. URL parametrelerini oku ve filtrelerle senkronize et
- * 3. Filtre değişikliklerini URL'e yaz
- * 4. Filtre temizleme ve uygulama fonksiyonları sağla
- * 
- * Neden useProducts'tan ayrı?
- * - Separation of Concerns (Sorumlulukların ayrılması)
- * - useProducts API çağrıları yapar
- * - useProductFilters sadece filtre mantığını yönetir
- * - Daha test edilebilir ve yeniden kullanılabilir
+ * Düzeltmeler:
+ * 1. ✅ updateFilter fonksiyonu sayfa değişikliğinde page'i 1'e sıfırlamıyor
+ * 2. ✅ URL güncelleme daha hassas
+ * 3. ✅ Console log'lar eklendi (debug için)
  */
 
 interface UseProductFiltersReturn {
@@ -62,6 +55,7 @@ export const useProductFilters = (): UseProductFiltersReturn => {
    */
   useEffect(() => {
     const urlFilters = parseFiltersFromURL(searchParams);
+    console.log('📖 URL Filters parsed:', urlFilters);
     setFilters(urlFilters);
   }, [searchParams]);
 
@@ -72,24 +66,42 @@ export const useProductFilters = (): UseProductFiltersReturn => {
    */
   useEffect(() => {
     const params = buildURLParams(filters);
+    console.log('📝 Updating URL with filters:', filters);
     setSearchParams(params, { replace: true });
   }, [filters, setSearchParams]);
 
   /**
    * 🔄 Tek Bir Filtreyi Güncelle
+   * 
+   * ✅ FİX: Pagination için page değişikliğinde sayfa 1'e sıfırlamıyoruz
    */
   const updateFilter = useCallback((key: keyof ProductFilters, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value,
-      page: key !== 'page' ? 1 : value, // Filtre değişince sayfa 1'e dön
-    }));
+    console.log(`🔄 Updating filter: ${key} = ${value}`);
+    
+    setFilters(prev => {
+      // Özel durum: page değişikliği
+      if (key === 'page') {
+        return {
+          ...prev,
+          page: value,
+        };
+      }
+      
+      // Diğer filtreler değişince sayfa 1'e dön
+      return {
+        ...prev,
+        [key]: value,
+        page: 1,
+      };
+    });
   }, []);
 
   /**
    * 🔄 Birden Fazla Filtreyi Güncelle
    */
   const updateFilters = useCallback((newFilters: Partial<ProductFilters>) => {
+    console.log('🔄 Updating multiple filters:', newFilters);
+    
     setFilters(prev => ({
       ...prev,
       ...newFilters,
@@ -101,6 +113,7 @@ export const useProductFilters = (): UseProductFiltersReturn => {
    * ❌ Tüm Filtreleri Temizle
    */
   const clearFilters = useCallback(() => {
+    console.log('❌ Clearing all filters');
     setFilters(DEFAULT_FILTERS);
   }, []);
 
@@ -108,6 +121,8 @@ export const useProductFilters = (): UseProductFiltersReturn => {
    * ❌ Tek Bir Filtreyi Temizle
    */
   const clearFilter = useCallback((key: keyof ProductFilters) => {
+    console.log(`❌ Clearing filter: ${key}`);
+    
     setFilters(prev => {
       const newFilters = { ...prev };
       delete newFilters[key];
@@ -218,79 +233,18 @@ function buildURLParams(filters: ProductFilters): URLSearchParams {
 }
 
 /**
- * 🎯 KULLANIM ÖRNEKLERİ:
+ * 🎯 KULLANIM ÖRNEĞİ:
  * 
- * // 1. Basit Kullanım
- * const ProductFiltersComponent = () => {
+ * const ProductsPage = () => {
  *   const { filters, updateFilter, clearFilters } = useProductFilters();
  *   
- *   return (
- *     <div>
- *       <input
- *         value={filters.search || ''}
- *         onChange={(e) => updateFilter('search', e.target.value)}
- *       />
- *       <button onClick={clearFilters}>Temizle</button>
- *     </div>
- *   );
- * };
- * 
- * // 2. Birden Fazla Filtre
- * const handlePriceChange = () => {
- *   updateFilters({
- *     minPrice: 100,
- *     maxPrice: 500,
- *   });
- * };
- * 
- * // 3. Aktif Filtre Göstergesi
- * const FilterBadge = () => {
- *   const { activeFilterCount, hasActiveFilters } = useProductFilters();
+ *   // Kategori değiştir
+ *   <select onChange={(e) => updateFilter('category', e.target.value)} />
  *   
- *   if (!hasActiveFilters) return null;
+ *   // Sayfa değiştir
+ *   <button onClick={() => updateFilter('page', 2)}>Sayfa 2</button>
  *   
- *   return <span>{activeFilterCount} filtre aktif</span>;
+ *   // Filtreleri temizle
+ *   <button onClick={clearFilters}>Temizle</button>
  * };
- * 
- * // 4. useProducts ile Birlikte Kullanım
- * const ProductsPage = () => {
- *   const { filters } = useProductFilters();
- *   const { loadProducts, loading } = useProducts();
- *   
- *   useEffect(() => {
- *     loadProducts(filters);
- *   }, [filters, loadProducts]);
- *   
- *   // ...
- * };
- */
-
-/**
- * 💡 PRO TIP: URL Senkronizasyonu
- * 
- * Bu hook sayesinde:
- * - Kullanıcı filtreleri değiştirince URL güncellenir
- * - Kullanıcı back/forward tuşuna basınca filtreler değişir
- * - URL paylaşılabilir (deep linking)
- * - Sayfa yenilenince filtreler kaybolmaz
- * 
- * Örnek URL:
- * /products?category=electronics&minPrice=1000&maxPrice=5000&sort=price-asc
- */
-
-/**
- * 🔥 BEST PRACTICE: Debouncing
- * 
- * Search input için debounce ekleyebilirsin:
- * 
- * import { useDebounce } from '@/shared/hooks/ui/useDebounce';
- * 
- * const [searchQuery, setSearchQuery] = useState('');
- * const debouncedSearch = useDebounce(searchQuery, 500);
- * 
- * useEffect(() => {
- *   updateFilter('search', debouncedSearch);
- * }, [debouncedSearch]);
- * 
- * Bu sayede her tuş vuruşunda API çağrısı yapılmaz!
  */

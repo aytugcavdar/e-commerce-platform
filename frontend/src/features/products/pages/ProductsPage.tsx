@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useProducts } from '../hooks/useProducts';
+import { useProductFilters } from '../hooks/useProductFilters'; // ✅ EKLENDİ
 import { useCart } from '@/features/cart/hooks/useCart';
 import ProductList from '../components/ProductList';
 import ProductFilters from '../components/ProductFilters';
@@ -12,49 +13,70 @@ import { Button } from '@/shared/components/ui/base';
 import type { Product } from '../types/product.types';
 
 /**
- * 🎓 ÖĞREN: ProductsPage
+ * 🎓 ÖĞREN: ProductsPage (Düzeltilmiş Versiyon)
  * 
- * Ürün listesi sayfası. Filtreleme, sayfalama ve arama özellikleri içerir.
- * 
- * Sorumlulukları:
- * 1. URL parametrelerinden filtreleri oku
- * 2. useProducts hook'u ile veri yönetimi
- * 3. useCart hook'u ile sepet yönetimi
- * 4. ProductList ve ProductFilters component'lerini entegre et
- * 5. Pagination (sayfalama) yönetimi
+ * Değişiklikler:
+ * 1. useProductFilters hook'u eklendi (URL senkronizasyonu için)
+ * 2. URL parametreleri otomatik olarak filtrelere çevriliyor
+ * 3. Filtreleme ve listeleme çalışıyor
  */
 const ProductsPage = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
+  // ✅ URL yönetimi için useProductFilters
+  const { filters, hasActiveFilters, activeFilterCount, updateFilter } = useProductFilters();
+
+  // ✅ Ürün listesi ve sepet
   const {
     products,
     loading,
     error,
     pagination,
-    filters,
-    updateFilters,
-    applyFilters,
-    changePage,
+    loadProducts,
     clearError,
   } = useProducts();
 
-  // 🎓 ÖĞREN: useCart Hook'unu Ekle
   const { addItem } = useCart();
 
   /**
-   * 🛒 Sepete Ekleme Handler'ı
+   * 🎯 URL değiştiğinde ürünleri yükle
    * 
-   * 🎓 ÖĞREN: Bu fonksiyon neden gerekli?
-   * - ProductList'e callback olarak gönderiyoruz
-   * - ProductCard'dan çağrılınca burası çalışır
-   * - Toast mesajı gösterir (kullanıcı geri bildirim)
+   * ✅ filters değiştiğinde otomatik olarak API çağrısı yapılır
+   */
+  useEffect(() => {
+    console.log('🔄 Filters changed, loading products:', filters);
+    
+    // Ürünleri yükle
+    loadProducts(filters).then(result => {
+      if (result.success) {
+        console.log('✅ Products loaded successfully:', result.data.products.length, 'items');
+      } else {
+        console.error('❌ Failed to load products:', result.error);
+      }
+    });
+    
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters.page, 
+    filters.limit, 
+    filters.sort,      // ✅ Sort değişince tetiklenir
+    filters.search, 
+    filters.category, 
+    filters.brand, 
+    filters.minPrice, 
+    filters.maxPrice, 
+    filters.inStock,
+    filters.isFeatured,
+    filters.status,
+    filters.tags
+  ]); // ✅ Specific dependencies
+
+  /**
+   * 🛒 Sepete Ekleme Handler'ı
    */
   const handleAddToCart = (product: Product) => {
-    // 1. Sepete ekle (Redux action)
     addItem(product, 1);
-    
-    // 2. Kullanıcıya bildir (Toast mesajı)
     toast.success(`${product.name} sepete eklendi! 🎉`, {
       duration: 2000,
       position: 'top-right',
@@ -62,52 +84,20 @@ const ProductsPage = () => {
   };
 
   /**
-   * 🎯 İlk yükleme - URL parametrelerinden filtreleri oku
-   */
-  useEffect(() => {
-    const initialFilters: any = {
-      page: parseInt(searchParams.get('page') || '1'),
-      limit: parseInt(searchParams.get('limit') || '20'),
-      sort: searchParams.get('sort') || 'newest',
-    };
-
-    // Diğer filtreleri ekle
-    if (searchParams.get('search')) initialFilters.search = searchParams.get('search');
-    if (searchParams.get('category')) initialFilters.category = searchParams.get('category');
-    if (searchParams.get('brand')) initialFilters.brand = searchParams.get('brand');
-    if (searchParams.get('minPrice')) initialFilters.minPrice = parseFloat(searchParams.get('minPrice')!);
-    if (searchParams.get('maxPrice')) initialFilters.maxPrice = parseFloat(searchParams.get('maxPrice')!);
-    if (searchParams.get('inStock')) initialFilters.inStock = searchParams.get('inStock') === 'true';
-    if (searchParams.get('isFeatured')) initialFilters.isFeatured = searchParams.get('isFeatured') === 'true';
-
-    updateFilters(initialFilters);
-    applyFilters();
-  }, [searchParams]);
-
-  /**
-   * 🔍 Filtreleri URL'e senkronize et
-   */
-  useEffect(() => {
-    const params: any = {};
-    
-    if (filters.page && filters.page !== 1) params.page = filters.page.toString();
-    if (filters.search) params.search = filters.search;
-    if (filters.category) params.category = filters.category;
-    if (filters.brand) params.brand = filters.brand;
-    if (filters.minPrice) params.minPrice = filters.minPrice.toString();
-    if (filters.maxPrice) params.maxPrice = filters.maxPrice.toString();
-    if (filters.inStock) params.inStock = 'true';
-    if (filters.sort && filters.sort !== 'newest') params.sort = filters.sort;
-
-    setSearchParams(params, { replace: true });
-  }, [filters, setSearchParams]);
-
-  /**
    * 📄 Sayfa değiştirme
+   * 
+   * ✅ updateFilter kullanarak URL güncellenir
    */
   const handlePageChange = (newPage: number) => {
-    changePage(newPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    updateFilter('page', newPage); // ✅ FİX: URL'i güncelle
+  };
+
+  /**
+   * 🔄 Sıralama değiştirme
+   */
+  const handleSortChange = (sort: string) => {
+    updateFilter('sort', sort as any); // ✅ FİX: URL'i güncelle
   };
 
   /**
@@ -134,12 +124,18 @@ const ProductsPage = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
             Filtreler {isMobileFilterOpen ? '▲' : '▼'}
+            {hasActiveFilters && (
+              <span className="ml-2 px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">
+                {activeFilterCount}
+              </span>
+            )}
           </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* 🎨 Sol Sidebar - Filtreler */}
           <aside className={`lg:block ${isMobileFilterOpen ? 'block' : 'hidden'}`}>
+            {/* ✅ ProductFilters artık useProductFilters ile çalışıyor */}
             <ProductFilters />
           </aside>
 
@@ -154,6 +150,7 @@ const ProductsPage = () => {
                 {!loading && (
                   <p className="text-gray-600">
                     {pagination.total} ürün bulundu
+                    {hasActiveFilters && ` (${activeFilterCount} filtre aktif)`}
                   </p>
                 )}
               </div>
@@ -163,15 +160,19 @@ const ProductsPage = () => {
                 <select
                   value={filters.sort || 'newest'}
                   onChange={(e) => {
-                    updateFilters({ sort: e.target.value as any });
-                    applyFilters();
+                    const newSort = e.target.value;
+                    console.log('🔄 Sort dropdown changed to:', newSort);
+                    handleSortChange(newSort);
                   }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="newest">En Yeni</option>
+                  <option value="oldest">En Eski</option>
                   <option value="price-asc">Fiyat: Düşük → Yüksek</option>
                   <option value="price-desc">Fiyat: Yüksek → Düşük</option>
                   <option value="name-asc">İsim: A → Z</option>
+                  <option value="name-desc">İsim: Z → A</option>
+                  <option value="popular">En Popüler</option>
                 </select>
               </div>
             </div>

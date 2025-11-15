@@ -1,103 +1,64 @@
 // frontend/src/features/products/components/ProductFilters.tsx
 
-import { useProducts } from '../hooks/useProducts';
+import { useProductFilters } from '../hooks/useProductFilters'; // ✅ DOĞRU HOOK
 import { Select, Button, Input } from '@/shared/components/ui/base';
 
 /**
- * 🎓 ÖĞREN: Filters Component Pattern
+ * 🎓 ÖĞREN: ProductFilters (Düzeltilmiş Versiyon)
  * 
- * Bu component'in sorumluluğu:
- * 1. Kullanıcıdan filtre bilgisi almak (kategori, fiyat, marka)
- * 2. useProducts hook'una iletmek
- * 3. "Filtrele" butonuna basınca uygulamak
- * 
- * ❓ Neden Hemen Filtrelemiyoruz?
- * - Her tuş vuruşunda API çağrısı YAPMAMALIYIZ (performans)
- * - Kullanıcı birden fazla filtre seçebilmeli
- * - "Filtrele" butonuna basınca tek seferde API'ye git
- * 
- * 💡 Alternatif Yaklaşım:
- * - Debounce kullan (500ms bekle, sonra filtrele)
- * - URL params'a yaz (tarayıcı geri butonu çalışsın)
+ * Değişiklikler:
+ * 1. useProducts yerine useProductFilters kullanıyor
+ * 2. Filtreler direkt URL'e yazılıyor
+ * 3. "Filtrele" butonu kaldırıldı (gereksiz)
+ * 4. Her değişiklik otomatik uygulanıyor
  */
 const ProductFilters = () => {
-  /**
-   * 🎯 Custom Hook Kullanımı
-   * 
-   * useProducts hook'undan ne aldık?
-   * - filters: Mevcut filtre değerleri (state)
-   * - updateFilters: Filtreleri güncelleme fonksiyonu
-   * - applyFilters: Filtreleri uygula (API çağrısı yap)
-   * - resetFilters: Tüm filtreleri temizle
-   */
   const { 
-    filters,        // Mevcut filtre state'i
-    updateFilters,  // Filtre değerini değiştir
-    applyFilters,   // API'ye gönder
-    resetFilters    // Sıfırla
-  } = useProducts();
+    filters,        
+    updateFilter,   // ✅ Tek bir filtreyi güncelle
+    updateFilters,  // ✅ Birden fazla filtreyi güncelle
+    clearFilters,   // ✅ Tüm filtreleri temizle
+    hasActiveFilters,
+    activeFilterCount,
+  } = useProductFilters();
 
   /**
-   * 🎓 ÖĞREN: Controlled Input Pattern
+   * 🎨 Kategori Değişikliği
    * 
-   * React'te input yönetiminin 2 yolu var:
-   * 
-   * 1. CONTROLLED (Tercih Edilen):
-   *    - value={filters.category}
-   *    - onChange={(e) => updateFilters({ category: e.target.value })}
-   *    - React state'i kontrol eder
-   * 
-   * 2. UNCONTROLLED (Önerilmez):
-   *    - ref={inputRef}
-   *    - DOM'dan değeri okur
-   * 
-   * ✅ Controlled Avantajları:
-   * - Değer her zaman senkron
-   * - Validation kolay
-   * - Reset kolay (state'i değiştir, UI otomatik güncellenir)
+   * ✅ updateFilter kullanarak URL otomatik güncellenir
    */
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    updateFilters({ 
-      category: e.target.value || undefined  // Boşsa undefined (API'ye gönderme)
-    });
+    const value = e.target.value;
+    updateFilter('category', value || undefined);
   };
 
   /**
-   * 🎓 ÖĞREN: Fiyat Aralığı Mantığı
-   * 
-   * ❓ Neden 2 Input?
-   * - Kullanıcı min ve max değer girebilmeli
-   * - Backend'e "minPrice=100&maxPrice=500" şeklinde gider
-   * 
-   * 💡 Validation (İyileştirme):
-   * - Min > Max olamaz
-   * - Negatif değer olamaz
-   * - Decimal değer formatla (1000.50 → 1,000.50)
+   * 💰 Fiyat Aralığı Değişiklikleri
    */
   const handleMinPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    updateFilters({
-      minPrice: value ? Number(value) : undefined
-    });
+    updateFilter('minPrice', value ? Number(value) : undefined);
   };
 
   const handleMaxPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    updateFilters({
-      maxPrice: value ? Number(value) : undefined
-    });
+    updateFilter('maxPrice', value ? Number(value) : undefined);
   };
 
   /**
-   * 🎓 ÖĞREN: Checkbox Pattern (Stok Kontrolü)
-   * 
-   * Checkbox için özel mantık:
-   * - Checked ise: inStock = true gönder
-   * - Unchecked ise: inStock = undefined (API'ye gönderme)
+   * ✅ Stok Durumu
    */
   const handleInStockChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    updateFilters({
-      inStock: e.target.checked ? true : undefined
+    updateFilter('inStock', e.target.checked ? true : undefined);
+  };
+
+  /**
+   * 🎨 Hızlı Fiyat Filtreleri
+   */
+  const handleQuickPriceFilter = (min: number, max?: number) => {
+    updateFilters({ 
+      minPrice: min, 
+      maxPrice: max 
     });
   };
 
@@ -106,10 +67,9 @@ const ProductFilters = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900">Filtreler</h3>
-        {/* Aktif filtre sayısı (opsiyonel) */}
-        {Object.keys(filters).length > 2 && ( // page ve limit hariç
+        {hasActiveFilters && (
           <span className="text-sm text-blue-600 font-medium">
-            {Object.keys(filters).length - 2} filtre aktif
+            {activeFilterCount} filtre aktif
           </span>
         )}
       </div>
@@ -125,11 +85,7 @@ const ProductFilters = () => {
           options={[
             { value: '', label: 'Tüm Kategoriler' },
             // 💡 TODO: Backend'den kategori listesi çek
-            // Örnek:
-            // categories.map(cat => ({ 
-            //   value: cat._id, 
-            //   label: cat.name 
-            // }))
+            // API çağrısı ile dinamik olarak doldurulmalı
           ]}
           fullWidth
         />
@@ -138,7 +94,7 @@ const ProductFilters = () => {
       {/* Fiyat Aralığı */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Fiyat Aralığı (TRY)
+          Fiyat Aralığı (₺)
         </label>
         <div className="flex gap-3">
           <Input
@@ -157,17 +113,23 @@ const ProductFilters = () => {
             min={0}
           />
         </div>
-        {/* Hızlı Fiyat Filtreleri (Opsiyonel) */}
+        
+        {/* Hızlı Fiyat Filtreleri */}
         <div className="flex flex-wrap gap-2 mt-3">
           {[
             { label: '0-100', min: 0, max: 100 },
             { label: '100-500', min: 100, max: 500 },
-            { label: '500+', min: 500, max: undefined }
+            { label: '500-1000', min: 500, max: 1000 },
+            { label: '1000+', min: 1000, max: undefined }
           ].map(range => (
             <button
               key={range.label}
-              onClick={() => updateFilters({ minPrice: range.min, maxPrice: range.max })}
-              className="px-3 py-1 text-sm border rounded-full hover:bg-gray-100 transition"
+              onClick={() => handleQuickPriceFilter(range.min, range.max)}
+              className={`px-3 py-1 text-sm border rounded-full transition ${
+                filters.minPrice === range.min && filters.maxPrice === range.max
+                  ? 'bg-blue-500 text-white border-blue-500'
+                  : 'hover:bg-gray-100 border-gray-300'
+              }`}
             >
               {range.label} ₺
             </button>
@@ -195,59 +157,45 @@ const ProductFilters = () => {
         </label>
         <Select
           value={filters.sort || 'newest'}
-          onChange={(e) => updateFilters({ sort: e.target.value as any })}
+          onChange={(e) => {
+            const newSort = e.target.value;
+            console.log('🔄 Sort filter changed to:', newSort);
+            updateFilter('sort', newSort as any);
+          }}
           options={[
             { value: 'newest', label: 'En Yeni' },
+            { value: 'oldest', label: 'En Eski' },
             { value: 'price-asc', label: 'Fiyat: Düşük → Yüksek' },
             { value: 'price-desc', label: 'Fiyat: Yüksek → Düşük' },
-            { value: 'name-asc', label: 'İsim: A → Z' }
+            { value: 'name-asc', label: 'İsim: A → Z' },
+            { value: 'name-desc', label: 'İsim: Z → A' },
+            { value: 'popular', label: 'En Popüler' }
           ]}
           fullWidth
         />
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex flex-col gap-2">
-        {/**
-         * 🎓 ÖĞREN: Filtrele vs Temizle
-         * 
-         * Filtrele Butonu:
-         * - applyFilters() çağırır
-         * - API'ye istek gönderir
-         * - Sayfa 1'e dönülür
-         * 
-         * Temizle Butonu:
-         * - resetFilters() çağırır
-         * - Tüm filtreleri sıfırlar
-         * - Varsayılan filtrelerle API'ye gider
-         */}
+      {/* Filtreleri Temizle Butonu */}
+      {hasActiveFilters && (
         <Button 
-          onClick={applyFilters} 
-          fullWidth
-          className="mb-2"
-        >
-          Filtrele
-        </Button>
-        
-        <Button 
-          onClick={resetFilters} 
+          onClick={clearFilters} 
           variant="outline" 
           fullWidth
         >
-          Filtreleri Temizle
+          Filtreleri Temizle ({activeFilterCount})
         </Button>
-      </div>
+      )}
 
-      {/* Aktif Filtre Göstergesi (Opsiyonel) */}
-      {filters.category && (
+      {/* Aktif Filtre Göstergesi */}
+      {hasActiveFilters && (
         <div className="mt-4 pt-4 border-t">
           <p className="text-xs text-gray-500 mb-2">Aktif Filtreler:</p>
           <div className="flex flex-wrap gap-2">
             {filters.category && (
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                Kategori: {filters.category}
+                Kategori
                 <button 
-                  onClick={() => updateFilters({ category: undefined })}
+                  onClick={() => updateFilter('category', undefined)}
                   className="ml-2 hover:text-blue-900"
                 >
                   ×
@@ -257,6 +205,34 @@ const ProductFilters = () => {
             {filters.minPrice && (
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-green-100 text-green-800">
                 Min: {filters.minPrice} ₺
+                <button 
+                  onClick={() => updateFilter('minPrice', undefined)}
+                  className="ml-2 hover:text-green-900"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {filters.maxPrice && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                Max: {filters.maxPrice} ₺
+                <button 
+                  onClick={() => updateFilter('maxPrice', undefined)}
+                  className="ml-2 hover:text-green-900"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {filters.inStock && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                Stokta Var
+                <button 
+                  onClick={() => updateFilter('inStock', undefined)}
+                  className="ml-2 hover:text-purple-900"
+                >
+                  ×
+                </button>
               </span>
             )}
           </div>
@@ -269,25 +245,14 @@ const ProductFilters = () => {
 export default ProductFilters;
 
 /**
- * 🎯 GELİŞMİŞ ÖZELLİKLER (İlerisi İçin):
+ * 🎯 NASIL ÇALIŞIYOR?
  * 
- * 1. URL Senkronizasyonu:
- * const [searchParams, setSearchParams] = useSearchParams();
- * useEffect(() => {
- *   setSearchParams(filters);
- * }, [filters]);
+ * 1. Kullanıcı kategori seçer → updateFilter('category', 'electronics')
+ * 2. useProductFilters → URL'i günceller: /products?category=electronics
+ * 3. ProductsPage useEffect tetiklenir (filters dependency)
+ * 4. loadProducts(filters) API çağrısı yapar
+ * 5. Ürünler güncellenir ✅
  * 
- * 2. Filtreleri Kaydet (LocalStorage):
- * localStorage.setItem('savedFilters', JSON.stringify(filters));
- * 
- * 3. Mobil için Drawer:
- * <Drawer open={isOpen}>
- *   <ProductFilters />
- * </Drawer>
- * 
- * 4. Kategori Ağacı (Multi-level):
- * <TreeSelect 
- *   data={categories} 
- *   onChange={...} 
- * />
+ * 💡 Artık "Filtrele" butonuna gerek yok!
+ * Her değişiklik otomatik uygulanıyor.
  */

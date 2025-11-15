@@ -15,96 +15,132 @@ class ProductController {
    * @access Public
    */
     static getAllProducts = asyncHandler(async (req, res) => {
-      const {
-      page = 1,
-      limit = 20,
-      sort = '-createdAt',
-      search,
-      category,
-      brand,
-      minPrice,
-      maxPrice,
-      inStock,
-      isFeatured,
-      status = 'active',
-      tags
-    } = req.query;
-    const filter ={};
+  const {
+    page = 1,
+    limit = 20,
+    sort = 'newest',
+    search,
+    category,
+    brand,
+    minPrice,
+    maxPrice,
+    inStock,
+    isFeatured,
+    status = 'active',
+    tags
+  } = req.query;
 
-    if (status) {
-      filter.status = status;
-    }
-    if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } }
-      ];
-    }
-    if (category) {
-      filter.category = category;
-    }
-    if (brand) {
-      filter.brand = brand;
-    }
-    if (minPrice || maxPrice) {
-      filter.price = {};
-      if (minPrice) filter.price.$gte = Number(minPrice);
-      if (maxPrice) filter.price.$lte = Number(maxPrice);
-    }
-
-    
-    if (inStock === 'true') {
-      filter.stock = { $gt: 0 };
-    }
-
-    
-    if (isFeatured !== undefined) {
-      filter.isFeatured = isFeatured === 'true';
-    }
-
-    
-    if (tags) {
-      const tagArray = tags.split(',').map(tag => tag.trim());
-      filter.tags = { $in: tagArray };
-    }
-
-   
-    const skip = (Number(page) - 1) * Number(limit);
-
-    const [products, total] = await Promise.all([
-      Product.find(filter)
-        .populate('category', 'name slug')
-        .populate('brand', 'name slug logo')
-        .sort(sort)
-        .skip(skip)
-        .limit(Number(limit))
-        .lean(),
-      Product.countDocuments(filter)
-    ]);
-
-    
-    const totalPages = Math.ceil(total / Number(limit));
-    const hasNextPage = Number(page) < totalPages;
-    const hasPrevPage = Number(page) > 1;
-
-    res.status(httpStatus.OK).json(
-      ResponseFormatter.success(
-        {
-          products,
-          pagination: {
-            total,
-            page: Number(page),
-            limit: Number(limit),
-            totalPages,
-            hasNextPage,
-            hasPrevPage
-          }
-        },
-        'Ürünler başarıyla getirildi'
-      )
-    );
+  console.log('📋 getAllProducts called with params:', {
+    page, limit, sort, search, category, brand, minPrice, maxPrice, inStock
   });
+
+  const filter = {};
+
+  if (status) {
+    filter.status = status;
+  }
+  if (search) {
+    filter.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { description: { $regex: search, $options: 'i' } },
+      { tags: { $regex: search, $options: 'i' } }
+    ];
+  }
+  if (category) {
+    filter.category = category;
+  }
+  if (brand) {
+    filter.brand = brand;
+  }
+  if (minPrice || maxPrice) {
+    filter.price = {};
+    if (minPrice) filter.price.$gte = Number(minPrice);
+    if (maxPrice) filter.price.$lte = Number(maxPrice);
+  }
+  if (inStock === 'true') {
+    filter.stock = { $gt: 0 };
+  }
+  if (isFeatured !== undefined) {
+    filter.isFeatured = isFeatured === 'true';
+  }
+  if (tags) {
+    const tagArray = tags.split(',').map(tag => tag.trim());
+    filter.tags = { $in: tagArray };
+  }
+
+  // ✅ SIRALAMA MANTĞI (DÜZELTİLDİ)
+  let sortOption = {};
+  
+  switch (sort) {
+    case 'newest':
+      sortOption = { createdAt: -1 }; // En yeni önce
+      break;
+    case 'oldest':
+      sortOption = { createdAt: 1 }; // En eski önce
+      break;
+    case 'price-asc':
+      sortOption = { price: 1 }; // Fiyat artan
+      break;
+    case 'price-desc':
+      sortOption = { price: -1 }; // Fiyat azalan
+      break;
+    case 'name-asc':
+      sortOption = { name: 1 }; // İsim A-Z
+      break;
+    case 'name-desc':
+      sortOption = { name: -1 }; // İsim Z-A
+      break;
+    case 'popular':
+      sortOption = { salesCount: -1, createdAt: -1 }; // En çok satan
+      break;
+    default:
+      sortOption = { createdAt: -1 }; // Varsayılan: en yeni
+  }
+
+  console.log('🔄 Sort option applied:', sortOption);
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const [products, total] = await Promise.all([
+    Product.find(filter)
+      .populate('category', 'name slug')
+      .populate('brand', 'name slug logo')
+      .sort(sortOption) // ✅ Sıralama uygulanıyor
+      .skip(skip)
+      .limit(Number(limit))
+      .lean(),
+    Product.countDocuments(filter)
+  ]);
+
+  const totalPages = Math.ceil(total / Number(limit));
+  const hasNextPage = Number(page) < totalPages;
+  const hasPrevPage = Number(page) > 1;
+
+  console.log('✅ Products fetched:', {
+    total,
+    page: Number(page),
+    totalPages,
+    productsCount: products.length,
+    sort: sortOption
+  });
+
+  res.status(httpStatus.OK).json(
+    ResponseFormatter.success(
+      {
+        products,
+        pagination: {
+          total,
+          page: Number(page),
+          limit: Number(limit),
+          totalPages,
+          hasNextPage,
+          hasPrevPage
+        }
+      },
+      'Ürünler başarıyla getirildi'
+    )
+  );
+});
 
     /**  * Get product by ID
    * @route GET /api/products/:id
