@@ -127,23 +127,38 @@ const handleSubmit = async (e: React.FormEvent) => {
     notes: notes.trim() || undefined,
   };
 
-  const result = await createNewOrder(orderData);
+  try {
+    const result = await createNewOrder(orderData);
 
-  if (result.success) {
-    toast.success('Sipariş oluşturuldu! 🎉');
-    navigate(`/orders/${result.data._id}`);
-  } else {
-    // ✅ Backend'den gelen hata mesajını göster
-    const errorMessage = result.error?.message || 'Sipariş oluşturulamadı';
-    toast.error(errorMessage);
-    
-    // Stok hatası varsa detayları göster
-    if (result.error?.data?.unavailableItems) {
-      console.error('Stokta olmayan ürünler:', result.error.data.unavailableItems);
+    console.log('✅ Order result:', result); 
+
+    if (result.success) {
+      toast.success('Sipariş oluşturuldu! 🎉');
+      
+      
+      const orderId = result.data?._id;
+      
+      if (orderId) {
+        navigate(`/orders/${orderId}`);
+      } else {
+        console.error('❌ Order ID not found in response:', result);
+        toast.error('Sipariş oluşturuldu ama detay sayfasına yönlendirilemedi');
+      }
+    } else {
+      // ✅ Backend'den gelen hata mesajını göster
+      const errorMessage = result.error?.message || result.error || 'Sipariş oluşturulamadı';
+      toast.error(errorMessage);
+      
+      // Stok hatası varsa detayları göster
+      if (result.error?.data?.unavailableItems) {
+        console.error('Stokta olmayan ürünler:', result.error.data.unavailableItems);
+      }
     }
+  } catch (error: any) {
+    console.error('❌ Order creation error:', error);
+    toast.error(error?.message || 'Bir hata oluştu');
   }
 };
-
   if (isEmpty) {
     return <Loading fullScreen message="Yönlendiriliyor..." />;
   }

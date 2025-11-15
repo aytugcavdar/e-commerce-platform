@@ -78,69 +78,57 @@ class InventoryController {
    * Bu işlem ATOMİK olmalıdır.
    * @param {object} payload - { orderId, items: [{ productId, quantity }] }
    */
-  static async handleReserveStock(payload) {
+   static async handleReserveStock(payload) {
     const { orderId, items } = payload;
     logger.info(`Received stock reservation request for order ${orderId}`);
 
-    const session = await mongoose.startSession(); // Transaction başlatıyoruz (opsiyonel ama daha güvenli)
+    const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
       const updates = items.map(async (item) => {
-        // Stoğu atomik olarak güncelle: reservedQuantity'yi artır
-        // AMA SADECE satılabilir miktar (stock - reserved) yeterliyse!
+        // ✅ DÜZELTME: 'productId' kullan, 'product' değil
         const updateResult = await Inventory.findOneAndUpdate(
           {
-            product: new mongoose.Types.ObjectId(item.productId),
-            // Koşul: stok - rezerve >= istenen miktar
+            productId: new mongoose.Types.ObjectId(item.productId), // ✅ DÜZELTME
             $expr: { $gte: [ { $subtract: ['$stockQuantity', '$reservedQuantity'] }, item.quantity ] }
           },
           {
-            $inc: { reservedQuantity: item.quantity } // Rezerveyi artır
+            $inc: { reservedQuantity: item.quantity }
           },
-          { new: true, session } // 'new: true' güncellenmiş belgeyi döndürür, session'ı kullan
+          { new: true, session }
         );
 
-        // Eğer updateResult null ise, ya ürün bulunamadı ya da stok yetersizdi (koşul sağlanmadı).
         if (!updateResult) {
             logger.error(`Stock reservation failed for product ${item.productId} (Order: ${orderId}). Insufficient available stock or product not found.`);
-            // Hata fırlatarak transaction'ı geri al (abort)
             throw new Error(`Insufficient stock or product not found for ${item.productId}`);
         }
         logger.info(`Stock reserved for product ${item.productId}: +${item.quantity}. New reserved: ${updateResult.reservedQuantity}`);
-         // Düşük stok kontrolü
+        
         if (updateResult.isLowStock) {
-            // Düşük stok olayını yayınla (Notification service dinleyebilir)
             publisher.publish('inventory.low_stock', {
                 productId: item.productId,
-                availableQuantity: updateResult.availableQuantity,
+                availableQuantity: updateResult.stockQuantity - updateResult.reservedQuantity,
                 threshold: updateResult.lowStockThreshold
             }).catch(err => logger.warn(`Failed to publish low_stock event for ${item.productId}:`, err));
         }
 
       });
 
-      // Tüm güncellemelerin bitmesini bekle
       await Promise.all(updates);
-
-      // Tüm güncellemeler başarılıysa transaction'ı onayla (commit)
       await session.commitTransaction();
       logger.info(`✅ Stock successfully reserved for all items in order ${orderId}`);
 
     } catch (error) {
-      // Herhangi bir güncelleme başarısız olursa transaction'ı geri al (abort)
       await session.abortTransaction();
       logger.error(`❌ Stock reservation failed for order ${orderId}, transaction aborted:`, error.message);
-      // Başarısızlık olayını yayınla (Order service dinleyip siparişi iptal edebilir)
+      
       publisher.publish('inventory.reservation.failed', {
           orderId,
           reason: error.message,
           items
       }).catch(err => logger.error(`Failed to publish reservation.failed event for order ${orderId}:`, err));
-      // Consumer'ın mesajı NACK etmesi (tekrar denememesi) için hatayı tekrar fırlatabiliriz.
-      // throw error; // Veya consumer mantığına bırakabiliriz.
     } finally {
-      // Session'ı her zaman bitir
       await session.endSession();
     }
   }
@@ -156,27 +144,22 @@ class InventoryController {
     const { orderId, items } = payload;
     logger.info(`Received stock release request for order ${orderId}`);
 
-    // Transaction burada da kullanılabilir ama $inc genellikle yeterince atomiktir.
-    // Basitlik için transaction kullanmayalım.
     try {
       const updates = items.map(async (item) => {
-        // Stoğu atomik olarak güncelle: reservedQuantity'yi azalt
-        // Sadece rezerve edilen miktar 0'dan büyükse azaltalım.
+        // ✅ DÜZELTME: 'productId' kullan
         const updateResult = await Inventory.findOneAndUpdate(
           {
-            product: new mongoose.Types.ObjectId(item.productId),
-            reservedQuantity: { $gte: item.quantity } // Rezerve >= bırakılacak miktar
+            productId: new mongoose.Types.ObjectId(item.productId),
+            reservedQuantity: { $gte: item.quantity }
           },
           {
-            $inc: { reservedQuantity: -item.quantity } // Rezerveyi azalt
+            $inc: { reservedQuantity: -item.quantity }
           },
-          { new: true } // Güncellenmiş belgeyi al
+          { new: true }
         );
 
         if (!updateResult) {
-            // Bu durum genellikle olmamalı (rezerve edilenden fazlası bırakılmaya çalışılıyor)
             logger.warn(`Stock release failed or unnecessary for product ${item.productId} (Order: ${orderId}). Reserved quantity might be less than release amount.`);
-            // Belki hata fırlatmak yerine loglamak yeterlidir?
         } else {
             logger.info(`Stock released for product ${item.productId}: -${item.quantity}. New reserved: ${updateResult.reservedQuantity}`);
         }
@@ -186,8 +169,54 @@ class InventoryController {
 
     } catch (error) {
       logger.error(`❌ Error during stock release for order ${orderId}:`, error.message);
-      // Bu hatanın yönetimi kritik olabilir. Loglama önemlidir.
-      // Belki bir 'inventory.release.failed' olayı yayınlanabilir.
+    }
+  }
+
+
+  static async handleCommitStock(payload) {
+    const { orderId, items } = payload;
+    logger.info(`Received stock commit request for order ${orderId}`);
+
+    try {
+      const updates = items.map(async (item) => {
+        // ✅ DÜZELTME: 'productId' kullan
+        const updateResult = await Inventory.findOneAndUpdate(
+          {
+            productId: new mongoose.Types.ObjectId(item.productId),
+            reservedQuantity: { $gte: item.quantity }
+          },
+          {
+            $inc: {
+                stockQuantity: -item.quantity,
+                reservedQuantity: -item.quantity
+            }
+          },
+          { new: true }
+        );
+
+        if (!updateResult) {
+            logger.error(`🚨 CRITICAL: Stock commit failed for product ${item.productId} (Order: ${orderId}). Reserved quantity issue?`);
+            throw new Error(`Stock commit failed for product ${item.productId}. Reserved quantity mismatch?`);
+        } else {
+             logger.info(`Stock committed for product ${item.productId}: -${item.quantity}. New stock: ${updateResult.stockQuantity}, New reserved: ${updateResult.reservedQuantity}`);
+             
+             if (updateResult.isLowStock) {
+                 publisher.publish('inventory.low_stock', { 
+                   productId: item.productId,
+                   availableQuantity: updateResult.stockQuantity - updateResult.reservedQuantity,
+                   threshold: updateResult.lowStockThreshold
+                 }).catch(err => logger.warn('Failed to publish low_stock event:', err));
+             }
+        }
+      });
+      await Promise.all(updates);
+      logger.info(`✅ Stock successfully committed for order ${orderId}`);
+
+    } catch (error) {
+      logger.error(`❌ CRITICAL: Error during stock commit for order ${orderId}:`, error.message);
+      
+      publisher.publish('inventory.commit.failed', { orderId, reason: error.message, items })
+          .catch(err => logger.error(`Failed to publish commit.failed event for order ${orderId}:`, err));
     }
   }
 

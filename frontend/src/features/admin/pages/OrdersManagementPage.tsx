@@ -9,16 +9,25 @@ import { Button } from '@/shared/components/ui/base';
 
 /**
  * 🎓 ÖĞREN: Sipariş Yönetimi
- * 
- * Admin siparişleri görüntüler ve durumlarını günceller.
- * 
- * Özellikler:
+ * * Admin siparişleri görüntüler ve durumlarını günceller.
+ * * Özellikler:
  * - Sipariş listesi
  * - Durum filtreleme
  * - Durum güncelleme (pending → shipped → delivered)
  * - Sipariş detay modal
  * - Arama (sipariş no, müşteri)
  */
+
+// ==================================================================
+// DÜZELTME 1: Arayüzler (Interface) API ile uyumlu hale getirildi
+// ==================================================================
+interface OrderItem {
+  productId: string;
+  name: string;
+  image: string;
+  price: number;
+  quantity: number;
+}
 
 interface Order {
   _id: string;
@@ -28,14 +37,7 @@ interface Order {
     lastName: string;
     email: string;
   };
-  items: Array<{
-    product: {
-      name: string;
-      images: Array<{ url: string }>;
-    };
-    quantity: number;
-    price: number;
-  }>;
+  orderItems: OrderItem[]; // 'items' -> 'orderItems' olarak düzeltildi
   totalPrice: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   shippingAddress: {
@@ -47,6 +49,7 @@ interface Order {
   };
   createdAt: string;
 }
+// ==================================================================
 
 const AdminOrdersPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -219,12 +222,15 @@ const AdminOrdersPage = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
-                        {order.user.firstName} {order.user.lastName}
+                        {order.user?.firstName} {order.user?.lastName}
                       </div>
-                      <div className="text-xs text-gray-500">{order.user.email}</div>
+                      <div className="text-xs text-gray-500">{order.user?.email}</div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-700">
-                      {order.items.length} ürün
+                      {/* ================================================= */}
+                      {/* DÜZELTME 2: 'items' -> 'orderItems'               */}
+                      {/* ================================================= */}
+                      {order.orderItems?.length ?? 0} ürün
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">
                       {formatCurrency(order.totalPrice)}
@@ -297,9 +303,9 @@ const AdminOrdersPage = () => {
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-900 mb-2">Müşteri</h3>
                 <p className="text-sm text-gray-700">
-                  {selectedOrder.user.firstName} {selectedOrder.user.lastName}
+                  {selectedOrder.user?.firstName} {selectedOrder.user?.lastName}
                 </p>
-                <p className="text-sm text-gray-500">{selectedOrder.user.email}</p>
+                <p className="text-sm text-gray-500">{selectedOrder.user?.email}</p>
               </div>
 
               {/* Teslimat Adresi */}
@@ -317,15 +323,21 @@ const AdminOrdersPage = () => {
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-900 mb-2">Ürünler</h3>
                 <div className="space-y-3">
-                  {selectedOrder.items.map((item, index) => (
+                  {/* ================================================= */}
+                  {/* DÜZELTME 3: 'items' -> 'orderItems'               */}
+                  {/* ================================================= */}
+                  {selectedOrder.orderItems.map((item, index) => (
                     <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                      {/* ================================================= */}
+                      {/* DÜZELTME 4: Ürün detayları düzeltildi              */}
+                      {/* ================================================= */}
                       <img
-                        src={item.product.images[0]?.url}
-                        alt={item.product.name}
+                        src={item.image}
+                        alt={item.name}
                         className="w-16 h-16 object-cover rounded"
                       />
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{item.product.name}</p>
+                        <p className="font-medium text-gray-900">{item.name}</p>
                         <p className="text-sm text-gray-600">Adet: {item.quantity}</p>
                       </div>
                       <p className="font-medium text-gray-900">
@@ -352,7 +364,7 @@ const AdminOrdersPage = () => {
                   <Button
                     fullWidth
                     onClick={() => {
-                      updateOrderStatus(selectedOrder._id, statusConfig[selectedOrder.status].next!);
+                      updateOrderStatus(selectedOrder._id, statusConfig[selectedDOrder.status].next!);
                       setDetailModalOpen(false);
                     }}
                   >

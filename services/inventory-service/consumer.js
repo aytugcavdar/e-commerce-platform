@@ -14,7 +14,7 @@ async function startConsumers() {
 
     const consumersToStart = [
       {
-        queue: 'order.created',
+        queue: 'inventory.reserve', // ✅ DÜZELTME: 'order.created' yerine 'inventory.reserve'
         handler: InventoryController.handleReserveStock,
         options: { durable: true, prefetch: 1, requeueOnError: false }
       },
@@ -33,7 +33,6 @@ async function startConsumers() {
         handler: InventoryController.handleCommitStock,
         options: { durable: true, prefetch: 1, requeueOnError: false }
       },
-      // ✅ YENİ: Ürün stok artırma eventi
       {
         queue: 'product.stock.increase',
         handler: InventoryController.handleStockIncrease,

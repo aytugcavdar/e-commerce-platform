@@ -401,14 +401,13 @@ class OrderController {
     const skip = (Number(page) - 1) * Number(limit);
 
     const [orders, total] = await Promise.all([
-      Order.find(filter)
-        .populate('user', 'firstName lastName email')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
-        .lean(),
-      Order.countDocuments(filter)
-    ]);
+      Order.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Order.countDocuments(filter)
+    ]);
 
     const totalPages = Math.ceil(total / Number(limit));
 

@@ -257,11 +257,12 @@ const OrderCard = ({ order }: OrderCardProps) => {
 
           {/* Ürünler */}
           <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span className="font-medium">{order.items.length} ürün</span>
+            {/* DÜZELTİLMİŞ YERLER */}
+            <span className="font-medium">{order.orderItems.length} ürün</span>
             <span>•</span>
             <span className="text-gray-500">
-              {order.items.slice(0, 2).map(item => item.name).join(', ')}
-              {order.items.length > 2 && ` +${order.items.length - 2} ürün`}
+              {order.orderItems.slice(0, 2).map(item => item.name).join(', ')}
+              {order.orderItems.length > 2 && ` +${order.orderItems.length - 2} ürün`}
             </span>
           </div>
         </div>
@@ -272,7 +273,7 @@ const OrderCard = ({ order }: OrderCardProps) => {
           <div className="text-right">
             <p className="text-sm text-gray-500 mb-1">Toplam</p>
             <p className="text-2xl font-bold text-gray-900">
-              {order.totalPrice.toLocaleString('tr-TR', {
+              {(order.totalPrice ?? 0).toLocaleString('tr-TR', {
                 style: 'currency',
                 currency: 'TRY',
               })}

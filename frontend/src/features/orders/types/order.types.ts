@@ -110,3 +110,34 @@ export interface OrderState {
   checkoutError: string | null;
   checkoutSuccess: boolean;
 }
+
+export const ORDER_STATUS_MAP: Record<
+  OrderStatus,
+  { label: string; icon: string; color: string }
+> = {
+  pending: {
+    label: 'Ödeme Bekleniyor',
+    icon: '🕒',
+    color: 'yellow',
+  },
+  paid: {
+    label: 'Ödendi',
+    icon: '✅',
+    color: 'green',
+  },
+  shipped: {
+    label: 'Kargolandı',
+    icon: '🚚',
+    color: 'blue',
+  },
+  delivered: {
+    label: 'Teslim Edildi',
+    icon: '📦',
+    color: 'purple',
+  },
+  cancelled: {
+    label: 'İptal Edildi',
+    icon: '❌',
+    color: 'red',
+  },
+};
