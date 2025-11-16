@@ -1,12 +1,12 @@
 // services/inventory-service/controllers/inventoryController.js
 
-const Inventory = require('../models/Inventory'); // Modelimizi import ediyoruz
+const Inventory = require('../models/Inventory');
 const {
   middleware: { asyncHandler },
   helpers: { ResponseFormatter },
   constants: { httpStatus, errorMessages },
   logger,
-  rabbitmq: { publisher } // Belki düşük stok uyarısı için lazım olur
+  rabbitmq: { publisher }
 } = require('@ecommerce/shared-utils');
 const mongoose = require('mongoose');
 
@@ -15,12 +15,9 @@ class InventoryController {
   /**
    * (SENKRON - Order Service tarafından çağrılır)
    * Birden fazla ürünün istenen miktarda satılabilir stoğu olup olmadığını kontrol eder.
-   * @route POST /api/inventory/check-bulk
-   * @access Private (Servisler arası iletişim)
-   * @body { items: [{ productId: "...", quantity: 1 }, ...] }
    */
-   static checkStockBulk = asyncHandler(async (req, res, next) => {
-    const { items } = req.body; // [{ productId, quantity }]
+  static checkStockBulk = asyncHandler(async (req, res, next) => {
+    const { items } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(httpStatus.BAD_REQUEST).json(
@@ -29,18 +26,13 @@ class InventoryController {
     }
 
     const productIds = items.map(item => new mongoose.Types.ObjectId(item.productId));
-
-    // ✅ DÜZELTME: Alan adı 'productId' olmalı
     const inventoryRecords = await Inventory.find({ productId: { $in: productIds } });
 
     let allAvailable = true;
     const unavailableItems = [];
 
     for (const item of items) {
-      // ✅ DÜZELTME: Alan adı 'productId' olmalı
       const record = inventoryRecords.find(inv => inv.productId.toString() === item.productId.toString());
-      
-      // Modeldeki virtual'ı (availableQuantity) kullanalım
       const available = record ? (record.stockQuantity - record.reservedQuantity) : 0;
 
       if (!record || available < item.quantity) {
@@ -55,7 +47,6 @@ class InventoryController {
     }
 
     if (!allAvailable) {
-      // ✅ Bu kısım doğru: Stok olmasa bile 200 OK dön
       return res.status(httpStatus.OK).json( 
         ResponseFormatter.success(
           { allAvailable: false, unavailableItems },
@@ -64,21 +55,17 @@ class InventoryController {
       );
     }
 
-    // Her şey yolundaysa başarılı cevap dön
     logger.info('Stock check successful for all items.');
     res.status(httpStatus.OK).json(
         ResponseFormatter.success({ allAvailable: true }, 'Tüm ürünler için yeterli stok mevcut.')
     );
   });
 
-
   /**
-   * (ASENKRON - RabbitMQ: order.created olayını dinler)
-   * Sipariş oluşturulduğunda ürünlerin stoğunu rezerve eder (reservedQuantity'yi artırır).
-   * Bu işlem ATOMİK olmalıdır.
-   * @param {object} payload - { orderId, items: [{ productId, quantity }] }
+   * (ASENKRON - RabbitMQ: inventory.reserve)
+   * Sipariş oluşturulduğunda ürünlerin stoğunu rezerve eder
    */
-   static async handleReserveStock(payload) {
+  static async handleReserveStock(payload) {
     const { orderId, items } = payload;
     logger.info(`Received stock reservation request for order ${orderId}`);
 
@@ -87,10 +74,9 @@ class InventoryController {
 
     try {
       const updates = items.map(async (item) => {
-        // ✅ DÜZELTME: 'productId' kullan, 'product' değil
         const updateResult = await Inventory.findOneAndUpdate(
           {
-            productId: new mongoose.Types.ObjectId(item.productId), // ✅ DÜZELTME
+            productId: new mongoose.Types.ObjectId(item.productId),
             $expr: { $gte: [ { $subtract: ['$stockQuantity', '$reservedQuantity'] }, item.quantity ] }
           },
           {
@@ -112,7 +98,6 @@ class InventoryController {
                 threshold: updateResult.lowStockThreshold
             }).catch(err => logger.warn(`Failed to publish low_stock event for ${item.productId}:`, err));
         }
-
       });
 
       await Promise.all(updates);
@@ -133,12 +118,9 @@ class InventoryController {
     }
   }
 
-
   /**
-   * (ASENKRON - RabbitMQ: order.cancelled veya payment.failed olaylarını dinler)
-   * Rezerve edilmiş stoğu serbest bırakır (reservedQuantity'yi azaltır).
-   * Bu işlem ATOMİK olmalıdır.
-   * @param {object} payload - { orderId, items: [{ productId, quantity }] }
+   * (ASENKRON - RabbitMQ: order.cancelled, payment.failed)
+   * Rezerve edilmiş stoğu serbest bırakır
    */
   static async handleReleaseStock(payload) {
     const { orderId, items } = payload;
@@ -146,7 +128,6 @@ class InventoryController {
 
     try {
       const updates = items.map(async (item) => {
-        // ✅ DÜZELTME: 'productId' kullan
         const updateResult = await Inventory.findOneAndUpdate(
           {
             productId: new mongoose.Types.ObjectId(item.productId),
@@ -172,14 +153,22 @@ class InventoryController {
     }
   }
 
-
+  /**
+   * ✅ DÜZELTME: (ASENKRON - RabbitMQ: payment.completed)
+   * Ödeme tamamlandığında stoğu kesinleştirir
+   */
   static async handleCommitStock(payload) {
     const { orderId, items } = payload;
-    logger.info(`Received stock commit request for order ${orderId}`);
+    logger.info(`🔵 Received stock commit request for order ${orderId}`);
+
+    // ✅ Transaction ekle
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
     try {
       const updates = items.map(async (item) => {
-        // ✅ DÜZELTME: 'productId' kullan
+        logger.info(`  🔹 Committing stock for product ${item.productId}, quantity: ${item.quantity}`);
+
         const updateResult = await Inventory.findOneAndUpdate(
           {
             productId: new mongoose.Types.ObjectId(item.productId),
@@ -191,129 +180,118 @@ class InventoryController {
                 reservedQuantity: -item.quantity
             }
           },
-          { new: true }
+          { new: true, session } // ✅ session ekle
         );
 
         if (!updateResult) {
             logger.error(`🚨 CRITICAL: Stock commit failed for product ${item.productId} (Order: ${orderId}). Reserved quantity issue?`);
             throw new Error(`Stock commit failed for product ${item.productId}. Reserved quantity mismatch?`);
-        } else {
-             logger.info(`Stock committed for product ${item.productId}: -${item.quantity}. New stock: ${updateResult.stockQuantity}, New reserved: ${updateResult.reservedQuantity}`);
-             
-             if (updateResult.isLowStock) {
-                 publisher.publish('inventory.low_stock', { 
-                   productId: item.productId,
-                   availableQuantity: updateResult.stockQuantity - updateResult.reservedQuantity,
-                   threshold: updateResult.lowStockThreshold
-                 }).catch(err => logger.warn('Failed to publish low_stock event:', err));
-             }
+        }
+
+        logger.info(`  ✅ Stock committed for product ${item.productId}: -${item.quantity}. New stock: ${updateResult.stockQuantity}, New reserved: ${updateResult.reservedQuantity}`);
+        
+        if (updateResult.isLowStock) {
+            publisher.publish('inventory.low_stock', { 
+              productId: item.productId,
+              availableQuantity: updateResult.stockQuantity - updateResult.reservedQuantity,
+              threshold: updateResult.lowStockThreshold
+            }).catch(err => logger.warn('Failed to publish low_stock event:', err));
         }
       });
+
       await Promise.all(updates);
+      await session.commitTransaction(); // ✅ Commit yap
       logger.info(`✅ Stock successfully committed for order ${orderId}`);
 
     } catch (error) {
+      await session.abortTransaction(); // ✅ Hata durumunda rollback
       logger.error(`❌ CRITICAL: Error during stock commit for order ${orderId}:`, error.message);
       
       publisher.publish('inventory.commit.failed', { orderId, reason: error.message, items })
           .catch(err => logger.error(`Failed to publish commit.failed event for order ${orderId}:`, err));
+    } finally {
+      await session.endSession(); // ✅ Session'ı kapat
     }
   }
 
-
   /**
-   * (ASENKRON - RabbitMQ: payment.completed olayını dinler)
-   * Ödeme tamamlandığında stoğu kesinleştirir (stockQuantity ve reservedQuantity'yi azaltır).
-   * Bu işlem ATOMİK olmalıdır.
-   * @param {object} payload - { orderId, items: [{ productId, quantity }] }
+   * (ASENKRON - RabbitMQ: product.stock.increase)
+   * Ürün stoğunu artırır
    */
-  static async handleCommitStock(payload) {
+  static async handleStockIncrease(payload) {
     const { orderId, items } = payload;
-    logger.info(`Received stock commit request for order ${orderId}`);
+    logger.info(`Received stock increase request from ${orderId}`);
 
-    // Transaction burada da kullanılabilir.
     try {
       const updates = items.map(async (item) => {
-        // Stoğu atomik olarak güncelle: Hem stockQuantity hem reservedQuantity'yi azalt
-        // Sadece rezerve edilen miktar yeterliyse yapalım.
-        const updateResult = await Inventory.findOneAndUpdate(
-          {
-            product: new mongoose.Types.ObjectId(item.productId),
-            reservedQuantity: { $gte: item.quantity } // Rezerve >= azaltılacak miktar
-          },
-          {
-            $inc: {
-                stockQuantity: -item.quantity,    // Gerçek stoğu azalt
-                reservedQuantity: -item.quantity // Rezerveyi azalt
-            }
-          },
-          { new: true }
-        );
+        const inventory = await Inventory.findOne({ 
+          productId: new mongoose.Types.ObjectId(item.productId) 
+        });
 
-        if (!updateResult) {
-            // Bu durum olmamalı (ödeme alındıysa stok rezerve edilmiş olmalıydı).
-            logger.error(`🚨 CRITICAL: Stock commit failed for product ${item.productId} (Order: ${orderId}). Reserved quantity issue?`);
-            // Hata fırlatıp işlemi durdurmak veya telafi mekanizması?
-            throw new Error(`Stock commit failed for product ${item.productId}. Reserved quantity mismatch?`);
+        if (inventory) {
+          inventory.stockQuantity += item.quantity;
+          await inventory.save();
+          logger.info(`Stock increased for product ${item.productId}: +${item.quantity}. New stock: ${inventory.stockQuantity}`);
         } else {
-             logger.info(`Stock committed for product ${item.productId}: -${item.quantity}. New stock: ${updateResult.stockQuantity}, New reserved: ${updateResult.reservedQuantity}`);
-             // Stok azaldıktan sonra düşük stok kontrolü tekrar yapılabilir.
-             if (updateResult.isLowStock) {
-                 publisher.publish('inventory.low_stock', { /* ... */ }).catch(err => logger.warn('Failed to publish low_stock event:', err));
-             }
+          const newInventory = new Inventory({
+            productId: new mongoose.Types.ObjectId(item.productId),
+            stockQuantity: item.quantity,
+            reservedQuantity: 0,
+            lowStockThreshold: 5
+          });
+          await newInventory.save();
+          logger.info(`New inventory record created for product ${item.productId} with stock: ${item.quantity}`);
         }
       });
+
       await Promise.all(updates);
-      logger.info(`✅ Stock successfully committed for order ${orderId}`);
+      logger.info(`✅ Stock increase completed for ${orderId}`);
 
     } catch (error) {
-      logger.error(`❌ CRITICAL: Error during stock commit for order ${orderId}:`, error.message);
-      // Bu çok kritik bir hata. Stoklar azaltılamadı ama ödeme alındı!
-      // 'inventory.commit.failed' olayı yayınlanmalı ve manuel müdahale gerekebilir.
-      publisher.publish('inventory.commit.failed', { orderId, reason: error.message, items })
-          .catch(err => logger.error(`Failed to publish commit.failed event for order ${orderId}:`, err));
-      // throw error; // Consumer NACK etsin mi?
+      logger.error(`❌ Stock increase failed for ${orderId}:`, error.message);
     }
   }
 
-
   /**
-   * (SENKRON - Admin Paneli veya Product Service tarafından çağrılır)
-   * Bir ürünün stoğunu manuel olarak ayarlar veya artırır/azaltır.
-   * @route PATCH /api/inventory/:productId
-   * @access Private/Admin
-   * @body { adjustment: 10 } veya { newStock: 100 }
+   * (SENKRON - Admin/Product Service)
+   * Bir ürünün stoğunu manuel olarak ayarlar
    */
   static adjustStock = asyncHandler(async (req, res, next) => {
     const { productId } = req.params;
-    const { adjustment, newStock } = req.body; // adjustment (+/-) veya newStock (yeni değer)
+    const { adjustment, newStock } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(productId)) { /* Bad Request */ }
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(httpStatus.BAD_REQUEST).json(
+        ResponseFormatter.error(errorMessages.INVALID_ID_FORMAT, httpStatus.BAD_REQUEST)
+      );
+    }
 
     let updateOperation = {};
     if (typeof adjustment === 'number') {
-        // $inc ile atomik artırma/azaltma
         updateOperation = { $inc: { stockQuantity: adjustment } };
     } else if (typeof newStock === 'number' && newStock >= 0) {
-        // $set ile yeni değeri atomik olarak ayarlama
         updateOperation = { $set: { stockQuantity: newStock } };
     } else {
-        return res.status(httpStatus.BAD_REQUEST).json(ResponseFormatter.error('Geçerli bir `adjustment` veya `newStock` değeri girilmelidir.', httpStatus.BAD_REQUEST));
+        return res.status(httpStatus.BAD_REQUEST).json(
+          ResponseFormatter.error('Geçerli bir `adjustment` veya `newStock` değeri girilmelidir.', httpStatus.BAD_REQUEST)
+        );
     }
 
     try {
-        // findOneAndUpdate atomik olarak çalışır. 'upsert: true' ürün için stok kaydı yoksa oluşturur.
         const updatedInventory = await Inventory.findOneAndUpdate(
             { product: new mongoose.Types.ObjectId(productId) },
             updateOperation,
-            { new: true, upsert: true, runValidators: true } // upsert: true önemli!
+            { new: true, upsert: true, runValidators: true }
         );
 
         logger.info(`Stock adjusted for product ${productId}. New stock: ${updatedInventory.stockQuantity}`);
 
-         // Düşük stok kontrolü
         if (updatedInventory.isLowStock) {
-            publisher.publish('inventory.low_stock', { /* ... */ }).catch(err => logger.warn('Failed to publish low_stock event:', err));
+            publisher.publish('inventory.low_stock', {
+              productId,
+              availableQuantity: updatedInventory.stockQuantity - updatedInventory.reservedQuantity,
+              threshold: updatedInventory.lowStockThreshold
+            }).catch(err => logger.warn('Failed to publish low_stock event:', err));
         }
 
         res.status(httpStatus.OK).json(
@@ -322,94 +300,59 @@ class InventoryController {
 
     } catch (error) {
         logger.error(`Failed to adjust stock for product ${productId}:`, error);
-        next(error); // Genel error handler'a gönder
+        next(error);
     }
   });
 
-   /**
-    * (SENKRON - Admin Paneli veya Diğer Servisler)
-    * Bir veya daha fazla ürünün stok bilgisini getirir.
-    * @route GET /api/inventory?productIds=id1,id2,... VEYA GET /api/inventory/:productId
-    * @access Private/Admin veya Servisler
-    */
-   static getInventory = asyncHandler(async (req, res, next) => {
-        const { productId } = req.params; // Tek ürün için
-        const { productIds } = req.query; // Çoklu ürün için (virgülle ayrılmış)
+  /**
+   * (SENKRON - Admin/Servisler)
+   * Bir veya daha fazla ürünün stok bilgisini getirir
+   */
+  static getInventory = asyncHandler(async (req, res, next) => {
+    const { productId } = req.params;
+    const { productIds } = req.query;
 
-        let filter = {};
-        if (productId) {
-            if (!mongoose.Types.ObjectId.isValid(productId)) { /* Bad Request */ }
-            filter = { product: new mongoose.Types.ObjectId(productId) };
-        } else if (productIds) {
-            const ids = productIds.split(',').map(id => {
-                if (!mongoose.Types.ObjectId.isValid(id.trim())) {
-                    throw new Error(errorMessages.INVALID_ID_FORMAT + ` (${id.trim()})`);
-                }
-                return new mongoose.Types.ObjectId(id.trim());
-            });
-            filter = { product: { $in: ids } };
-        } else {
-            // Tüm stokları getirmek istenebilir (admin için, sayfalama ile)
-            // Şimdilik ID olmadan istek gelirse hata döndürelim.
-            return res.status(httpStatus.BAD_REQUEST).json(ResponseFormatter.error('Ürün ID(leri) belirtilmelidir.', httpStatus.BAD_REQUEST));
+    let filter = {};
+    if (productId) {
+        if (!mongoose.Types.ObjectId.isValid(productId)) {
+          return res.status(httpStatus.BAD_REQUEST).json(
+            ResponseFormatter.error(errorMessages.INVALID_ID_FORMAT, httpStatus.BAD_REQUEST)
+          );
         }
-
-        try {
-            const inventory = await Inventory.find(filter).lean(); // lean() daha hızlı
-
-            if (productId && (!inventory || inventory.length === 0)) {
-                return res.status(httpStatus.NOT_FOUND).json(ResponseFormatter.error('Belirtilen ürün için stok kaydı bulunamadı.', httpStatus.NOT_FOUND));
+        filter = { product: new mongoose.Types.ObjectId(productId) };
+    } else if (productIds) {
+        const ids = productIds.split(',').map(id => {
+            if (!mongoose.Types.ObjectId.isValid(id.trim())) {
+                throw new Error(errorMessages.INVALID_ID_FORMAT + ` (${id.trim()})`);
             }
-
-            // Tek ürün istendiyse obje, çoklu istendiyse dizi döndür
-            const resultData = productId ? inventory[0] : inventory;
-
-            res.status(httpStatus.OK).json(
-                ResponseFormatter.success(resultData, 'Stok bilgisi başarıyla getirildi.')
-            );
-        } catch(error) {
-            logger.error('Failed to get inventory:', error);
-            next(error);
-        }
-   });
-
-   static async handleStockIncrease(payload) {
-  const { orderId, items } = payload;
-  logger.info(`Received stock increase request from ${orderId}`);
-
-  try {
-    const updates = items.map(async (item) => {
-      // Ürün için inventory kaydı var mı kontrol et
-      const inventory = await Inventory.findOne({ 
-        productId: new mongoose.Types.ObjectId(item.productId) 
-      });
-
-      if (inventory) {
-        // ✅ Kayıt varsa stok artır
-        inventory.stockQuantity += item.quantity;
-        await inventory.save();
-        logger.info(`Stock increased for product ${item.productId}: +${item.quantity}. New stock: ${inventory.stockQuantity}`);
-      } else {
-        // ✅ Kayıt yoksa yeni oluştur
-        const newInventory = new Inventory({
-          productId: new mongoose.Types.ObjectId(item.productId),
-          stockQuantity: item.quantity,
-          reservedQuantity: 0,
-          lowStockThreshold: 5 // Varsayılan eşik
+            return new mongoose.Types.ObjectId(id.trim());
         });
-        await newInventory.save();
-        logger.info(`New inventory record created for product ${item.productId} with stock: ${item.quantity}`);
-      }
-    });
+        filter = { product: { $in: ids } };
+    } else {
+        return res.status(httpStatus.BAD_REQUEST).json(
+          ResponseFormatter.error('Ürün ID(leri) belirtilmelidir.', httpStatus.BAD_REQUEST)
+        );
+    }
 
-    await Promise.all(updates);
-    logger.info(`✅ Stock increase completed for ${orderId}`);
+    try {
+        const inventory = await Inventory.find(filter).lean();
 
-  } catch (error) {
-    logger.error(`❌ Stock increase failed for ${orderId}:`, error.message);
-  }
+        if (productId && (!inventory || inventory.length === 0)) {
+            return res.status(httpStatus.NOT_FOUND).json(
+              ResponseFormatter.error('Belirtilen ürün için stok kaydı bulunamadı.', httpStatus.NOT_FOUND)
+            );
+        }
+
+        const resultData = productId ? inventory[0] : inventory;
+
+        res.status(httpStatus.OK).json(
+            ResponseFormatter.success(resultData, 'Stok bilgisi başarıyla getirildi.')
+        );
+    } catch(error) {
+        logger.error('Failed to get inventory:', error);
+        next(error);
+    }
+  });
 }
-
-} // InventoryController sonu
 
 module.exports = InventoryController;

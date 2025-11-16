@@ -3,7 +3,7 @@
 const { rabbitmq, logger } = require('@ecommerce/shared-utils');
 const InventoryController = require('./controllers/inventoryController');
 
-const { consumer } = rabbitmq; // Shared-utils'daki consumer helper'ını alıyoruz
+const { consumer } = rabbitmq;
 
 /**
  * RabbitMQ olaylarını dinleyip ilgili controller fonksiyonlarını çağırır.
@@ -14,7 +14,7 @@ async function startConsumers() {
 
     const consumersToStart = [
       {
-        queue: 'inventory.reserve', // ✅ DÜZELTME: 'order.created' yerine 'inventory.reserve'
+        queue: 'inventory.reserve',
         handler: InventoryController.handleReserveStock,
         options: { durable: true, prefetch: 1, requeueOnError: false }
       },
@@ -28,6 +28,7 @@ async function startConsumers() {
         handler: InventoryController.handleReleaseStock,
         options: { durable: true, prefetch: 5, requeueOnError: true }
       },
+      // ✅ DÜZELTME: payment.completed için SADECE handleCommitStock
       {
         queue: 'payment.completed',
         handler: InventoryController.handleCommitStock,
