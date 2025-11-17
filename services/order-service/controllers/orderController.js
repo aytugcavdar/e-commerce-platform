@@ -193,6 +193,11 @@ class OrderController {
       paymentMethod: savedOrder.paymentMethod
     });
 
+    await publisher.publish('cart.clear', {
+      userId: savedOrder.user,
+      orderId: savedOrder._id
+    });
+
     return res
       .status(httpStatus.CREATED)
       .json(ResponseFormatter.success(savedOrder, 'Sipariş başarıyla oluşturuldu.'));

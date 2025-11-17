@@ -10,27 +10,20 @@ import CartSummary from '@/features/cart/components/CartSummary';
 import { Container } from '@/shared/components/layout';
 import { Button, Input } from '@/shared/components/ui/base';
 import { Loading } from '@/shared/components/ui/feedback';
-// order.types.ts'den ShippingAddress ve PaymentMethodType'ı import ettiğimizi varsayıyoruz
-// (Bir önceki turda bu dosyanın içeriğini görmüştük)
 import type { ShippingAddress, PaymentMethodType } from '../types/order.types';
 
 /**
- * 🎓 ÖĞREN: CheckoutPage
- * * Ödeme sayfası. Kullanıcı teslimat adresi ve ödeme yöntemi seçer.
- * * Adımlar:
- * 1. Teslimat Adresi
- * 2. Ödeme Yöntemi
- * 3. Sipariş Özeti
- * 4. Sipariş Oluştur
+ * 🎓 ÖĞREN: CheckoutPage (Güncellenmiş)
+ * 
+ * ✅ YENİ: Sipariş başarılı olunca sepet otomatik temizlenir
  */
 
-// Frontend'in state'i için arayüz (district içerebilir)
 interface CheckoutShippingAddress {
   fullName: string;
   phone: string;
-  address: string; // 'addressLine1' için
+  address: string;
   city: string;
-  district: string; // 'state' için
+  district: string;
   postalCode: string;
   country: string;
 }
@@ -38,7 +31,9 @@ interface CheckoutShippingAddress {
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { items, summary, coupon, isEmpty } = useCart();
+  
+  // ✅ DÜZELTME: clear metodunu da al
+  const { items, summary, coupon, isEmpty, clear } = useCart();
   const { createNewOrder, creatingOrder } = useOrders();
 
   // Teslimat Adresi
@@ -72,93 +67,101 @@ const CheckoutPage = () => {
    * 📝 Form Validasyonu
    */
   const validateForm = (): boolean => {
-  if (!shippingAddress.fullName.trim()) {
-    toast.error('Ad Soyad giriniz');
-    return false;
-  }
-  if (!shippingAddress.phone.trim()) {
-    toast.error('Telefon numarası giriniz');
-    return false;
-  }
-  if (!shippingAddress.address.trim()) {
-    toast.error('Adres giriniz');
-    return false;
-  }
-  if (!shippingAddress.city.trim()) {
-    toast.error('İl seçiniz');
-    return false;
-  }
-  if (!shippingAddress.district.trim()) {
-    toast.error('İlçe giriniz');
-    return false;
-  }
-  if (!shippingAddress.postalCode.trim()) {  // ✅ EKLENDİ
-    toast.error('Posta kodu giriniz');
-    return false;
-  }
-  return true;
-};
+    if (!shippingAddress.fullName.trim()) {
+      toast.error('Ad Soyad giriniz');
+      return false;
+    }
+    if (!shippingAddress.phone.trim()) {
+      toast.error('Telefon numarası giriniz');
+      return false;
+    }
+    if (!shippingAddress.address.trim()) {
+      toast.error('Adres giriniz');
+      return false;
+    }
+    if (!shippingAddress.city.trim()) {
+      toast.error('İl seçiniz');
+      return false;
+    }
+    if (!shippingAddress.district.trim()) {
+      toast.error('İlçe giriniz');
+      return false;
+    }
+    if (!shippingAddress.postalCode.trim()) {
+      toast.error('Posta kodu giriniz');
+      return false;
+    }
+    return true;
+  };
 
   /**
    * 🛒 Sipariş Oluştur
+   * 
+   * ✅ YENİ: Başarılı olunca sepeti temizle
    */
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  if (!validateForm()) return;
+    if (!validateForm()) return;
 
-  const orderData = {
-    items: items.map(item => ({
-      product: item.productId,
-      quantity: item.quantity,
-    })),
-    shippingAddress: {
-      fullName: shippingAddress.fullName,
-      phone: shippingAddress.phone,
-      addressLine1: shippingAddress.address,
-      addressLine2: '',
-      city: shippingAddress.city,
-      state: shippingAddress.district,
-      postalCode: shippingAddress.postalCode,
-      country: shippingAddress.country,
-    },
-    paymentMethod: paymentMethod,
-    couponCode: coupon?.code,
-    notes: notes.trim() || undefined,
+    const orderData = {
+      items: items.map(item => ({
+        product: item.productId,
+        quantity: item.quantity,
+      })),
+      shippingAddress: {
+        fullName: shippingAddress.fullName,
+        phone: shippingAddress.phone,
+        addressLine1: shippingAddress.address,
+        addressLine2: '',
+        city: shippingAddress.city,
+        state: shippingAddress.district,
+        postalCode: shippingAddress.postalCode,
+        country: shippingAddress.country,
+      },
+      paymentMethod: paymentMethod,
+      couponCode: coupon?.code,
+      notes: notes.trim() || undefined,
+    };
+
+    try {
+      const result = await createNewOrder(orderData);
+
+      console.log('✅ Order result:', result);
+
+      if (result.success) {
+        // ✅ 1. Sepeti temizle
+        console.log('🧹 Sepet temizleniyor...');
+        clear();
+        
+        // ✅ 2. Başarı mesajı
+        toast.success('Sipariş oluşturuldu! 🎉');
+        
+        // ✅ 3. Sipariş detay sayfasına yönlendir
+        const orderId = result.data?._id;
+        
+        if (orderId) {
+          navigate(`/orders/${orderId}`);
+        } else {
+          console.error('❌ Order ID not found in response:', result);
+          toast.error('Sipariş oluşturuldu ama detay sayfasına yönlendirilemedi');
+          navigate('/orders');
+        }
+      } else {
+        // ❌ Hata - Sepet olduğu gibi kalır
+        const errorMessage = result.error?.message || result.error || 'Sipariş oluşturulamadı';
+        toast.error(errorMessage);
+        
+        if (result.error?.data?.unavailableItems) {
+          console.error('Stokta olmayan ürünler:', result.error.data.unavailableItems);
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Order creation error:', error);
+      toast.error(error?.message || 'Bir hata oluştu');
+    }
   };
 
-  try {
-    const result = await createNewOrder(orderData);
-
-    console.log('✅ Order result:', result); 
-
-    if (result.success) {
-      toast.success('Sipariş oluşturuldu! 🎉');
-      
-      
-      const orderId = result.data?._id;
-      
-      if (orderId) {
-        navigate(`/orders/${orderId}`);
-      } else {
-        console.error('❌ Order ID not found in response:', result);
-        toast.error('Sipariş oluşturuldu ama detay sayfasına yönlendirilemedi');
-      }
-    } else {
-      // ✅ Backend'den gelen hata mesajını göster
-      const errorMessage = result.error?.message || result.error || 'Sipariş oluşturulamadı';
-      toast.error(errorMessage);
-      
-      // Stok hatası varsa detayları göster
-      if (result.error?.data?.unavailableItems) {
-        console.error('Stokta olmayan ürünler:', result.error.data.unavailableItems);
-      }
-    }
-  } catch (error: any) {
-    console.error('❌ Order creation error:', error);
-    toast.error(error?.message || 'Bir hata oluştu');
-  }
-};
   if (isEmpty) {
     return <Loading fullScreen message="Yönlendiriliyor..." />;
   }
@@ -260,7 +263,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                         postalCode: e.target.value
                       }))}
                       placeholder="34000"
-                      required // required eklendi
+                      required
                       fullWidth
                     />
                   </div>
@@ -351,3 +354,19 @@ const handleSubmit = async (e: React.FormEvent) => {
 };
 
 export default CheckoutPage;
+
+/**
+ * 🎯 SEPET TEMİZLEME AKIŞI:
+ * 
+ * 1. Kullanıcı formu doldurur
+ * 2. "Siparişi Tamamla" butonuna tıklar
+ * 3. handleSubmit çalışır
+ * 4. Backend'e sipariş gönderilir
+ * 5. result.success === true ise:
+ *    ✅ clear() çağrılır → Redux'tan sepet temizlenir
+ *    ✅ toast.success() → "Sipariş oluşturuldu! 🎉"
+ *    ✅ navigate() → Sipariş detay sayfasına yönlendir
+ * 6. Hata varsa:
+ *    ❌ Sepet olduğu gibi kalır
+ *    ❌ toast.error() → Hata mesajı göster
+ */
