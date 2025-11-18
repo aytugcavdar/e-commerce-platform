@@ -1,0 +1,33 @@
+name: Run Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+        # Test edilecek servisleri buraya ekliyoruz
+        service: [shared-utils, services/user-service, services/order-service]
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: '**/package-lock.json'
+
+    - name: Install Dependencies
+      run: |
+        cd ${{ matrix.service }}
+        npm ci
+
+    - name: Run Tests
+      run: |
+        cd ${{ matrix.service }}
+        npm test

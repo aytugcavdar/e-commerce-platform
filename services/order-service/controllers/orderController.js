@@ -329,8 +329,11 @@ class OrderController {
       );
     }
 
-  
-    await order.updateStatus('cancelled', reason || 'Müşteri isteğiyle iptal edildi.', userId); // Model metodunu kullanalım ✅
+    // ✅ BUG FIX: Mevcut durumu sakla
+    const previousStatus = order.status;
+
+    // Update status
+    await order.updateStatus('cancelled', reason || 'Müşteri isteğiyle iptal edildi.', userId); 
 
     try {
       const inventoryPayload = {
@@ -340,16 +343,15 @@ class OrderController {
           quantity: item.quantity
         }))
       };
-      await publisher.publish('product.stock.increase', inventoryPayload); // Veya 'product.stock.release'
+      await publisher.publish('product.stock.increase', inventoryPayload); 
       logger.info(`Published stock release request for cancelled order ${order.orderNumber}`);
     } catch (publishError) {
       logger.error(`🚨 CRITICAL: Failed to publish stock release event for cancelled order ${order.orderNumber}:`, publishError);
-      
     }
 
    
     
-    if (['confirmed', 'processing'].includes(order.status) && order.paymentStatus === 'completed') {
+    if (['confirmed', 'processing'].includes(previousStatus) && order.paymentStatus === 'completed') {
         try {
             await publisher.publish('payment.refund', { orderId: order._id, amount: order.total /*...*/ });
             logger.info(`Published payment refund request for cancelled order ${order.orderNumber}`);
@@ -357,7 +359,6 @@ class OrderController {
     }
 
 
-   
     try {
        await publisher.publish('notification.order.cancelled', { orderId: order._id, userEmail: req.user.email, orderNumber: order.orderNumber, reason });
        logger.info(`Published order cancelled notification event for order ${order.orderNumber}`);
@@ -368,7 +369,6 @@ class OrderController {
       ResponseFormatter.success(order, 'Sipariş başarıyla iptal edildi')
     );
   });
-
   /**
    * Get all orders (Admin)
    * @route GET /api/orders/admin/all
